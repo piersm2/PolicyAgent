@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import type {
+  Briefing,
   DashboardStats,
   Payer,
   Policy,
@@ -221,6 +222,55 @@ export function createChange(
   // Touch the parent policy's updatedAt so lists reflect the activity.
   db.prepare("UPDATE policies SET updatedAt = datetime('now') WHERE id = ?").run(input.policyId);
   return db.prepare("SELECT * FROM policy_changes WHERE id = ?").get(Number(info.lastInsertRowid)) as PolicyChange;
+}
+
+/** All changes grouped by policyId, each list newest-first. For ranking/summaries. */
+export function changesByPolicy(): Map<number, PolicyChange[]> {
+  const rows = getDb()
+    .prepare("SELECT * FROM policy_changes ORDER BY changeDate DESC, id DESC")
+    .all() as PolicyChange[];
+  const map = new Map<number, PolicyChange[]>();
+  for (const c of rows) {
+    const list = map.get(c.policyId);
+    if (list) list.push(c);
+    else map.set(c.policyId, [c]);
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Briefings (stored/logged AI or rule-based summaries)
+// ---------------------------------------------------------------------------
+function rowToBriefing(row: any): Briefing {
+  return { ...row, policyIds: JSON.parse(row.policyIds || "[]") };
+}
+
+export function storeBriefing(input: Omit<Briefing, "id" | "generatedAt">): Briefing {
+  const info = getDb()
+    .prepare(
+      `INSERT INTO briefings (source, model, summary, policyIds)
+       VALUES (@source, @model, @summary, @policyIds)`
+    )
+    .run({
+      source: input.source,
+      model: input.model ?? null,
+      summary: input.summary,
+      policyIds: JSON.stringify(input.policyIds ?? []),
+    });
+  return getBriefing(Number(info.lastInsertRowid))!;
+}
+
+export function getBriefing(id: number): Briefing | undefined {
+  const row = getDb().prepare("SELECT * FROM briefings WHERE id = ?").get(id);
+  return row ? rowToBriefing(row) : undefined;
+}
+
+export function listBriefings(limit = 20): Briefing[] {
+  return (
+    getDb()
+      .prepare("SELECT * FROM briefings ORDER BY id DESC LIMIT ?")
+      .all(limit) as any[]
+  ).map(rowToBriefing);
 }
 
 // ---------------------------------------------------------------------------

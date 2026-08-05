@@ -111,6 +111,15 @@ export interface PolicyChangeWithContext extends PolicyChange {
   payerName: string;
 }
 
+export interface Briefing {
+  id: number;
+  generatedAt: string;
+  source: "ai" | "rule";
+  model: string | null;
+  summary: string;
+  policyIds: number[];
+}
+
 export interface DashboardStats {
   totalPolicies: number;
   activePolicies: number;

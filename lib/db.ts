@@ -55,6 +55,15 @@ function initSchema(db: Database.Database) {
       createdAt   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS briefings (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      generatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      source      TEXT NOT NULL,             -- 'ai' | 'rule'
+      model       TEXT,                      -- model id when source = 'ai'
+      summary     TEXT NOT NULL,             -- generated narrative (markdown)
+      policyIds   TEXT NOT NULL DEFAULT '[]' -- JSON array of the ranked policy ids
+    );
+
     CREATE INDEX IF NOT EXISTS idx_policies_payer ON policies(payerId);
     CREATE INDEX IF NOT EXISTS idx_changes_policy ON policy_changes(policyId);
   `);

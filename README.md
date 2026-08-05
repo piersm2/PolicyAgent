@@ -24,6 +24,23 @@ It answers the questions a policy desk actually asks:
 - **Policy detail** — full metadata plus a change-history timeline you can append to.
 - **Payers** — payer directory with per-payer policy counts and contact info.
 - **Change Log** — every logged change across all payers, grouped by date.
+- **Briefing** — surfaces and summarizes the important ones (see below).
+
+## Finding the important ones — the Briefing
+
+Tracking is only half the job; the Briefing tells you *what to act on*.
+
+- **Priority engine** — a deterministic scorer ranks every active/upcoming policy
+  by impact, status, days-to-effective-date, review-overdue pressure, recent
+  change activity, and category weight (prior-auth / reimbursement rank highest).
+  Each policy shows its score and the plain-English reasons behind it.
+- **Executive summary** — one click writes a briefing over the top of that queue.
+  When `ANTHROPIC_API_KEY` is set, **Claude** authors it; otherwise a built-in
+  rule-based narrative is used, so the feature works with zero configuration.
+- **Logged & stored** — every generated briefing is saved (AI or rule-based,
+  with model + timestamp) and kept as browsable history.
+
+Configure the model with `POLICYAGENT_MODEL` (defaults to `claude-opus-5`).
 
 ## Tech stack
 
@@ -31,6 +48,8 @@ It answers the questions a policy desk actually asks:
 - **Tailwind CSS**
 - **SQLite** via `better-sqlite3` — a single local file at `data/policyagent.db`,
   created and **seeded automatically on first run** (no migrations to run)
+- **Claude** via `@anthropic-ai/sdk` for the executive summary (optional — falls
+  back to a rule-based summary when no API key is present)
 
 ## Getting started
 
@@ -56,6 +75,7 @@ payers and eleven representative policies. Delete that file to reset to a clean 
 | `payers`         | Insurer / plan — name, type (Commercial, MA, Medicaid, …), website, contact.     |
 | `policies`       | Belongs to a payer — title, category, status, impact, effective/review dates.    |
 | `policy_changes` | Append-only history entries per policy — date, type (New/Revised/Retired), note. |
+| `briefings`      | Stored executive summaries — source (`ai`/`rule`), model, text, ranked policy ids. |
 
 Deleting a payer cascades to its policies; deleting a policy cascades to its changes.
 
@@ -71,6 +91,8 @@ All routes return JSON and validate input server-side.
 | `GET/POST /api/policies`             | List (with filters) / create          |
 | `GET/PUT/DELETE /api/policies/:id`   | Read (with changes) / update / delete |
 | `GET/POST /api/policies/:id/changes` | List / append change-history entries  |
+| `GET  /api/briefings`                | List stored briefings (history)       |
+| `POST /api/briefings`                | Generate + store an executive briefing |
 
 Policy list filters (query params): `search`, `payerId`, `category`, `status`, `impact`.
 
