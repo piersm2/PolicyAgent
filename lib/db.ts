@@ -48,6 +48,36 @@ function initSchema(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_policies_payer ON policies(payerId);
     CREATE INDEX IF NOT EXISTS idx_changes_policy ON policy_changes(policyId);
+
+    -- Payer web pages the app checks for changes, with the last snapshot taken.
+    CREATE TABLE IF NOT EXISTS watch_pages (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      payerId       INTEGER NOT NULL REFERENCES payers(id) ON DELETE CASCADE,
+      url           TEXT NOT NULL,
+      label         TEXT NOT NULL,
+      lastCheckedAt TEXT,
+      lastSuccessAt TEXT,
+      lastError     TEXT,
+      lastNote      TEXT,
+      snapshot      TEXT,            -- JSON Snapshot from lib/extract.ts
+      createdAt     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Differences found between two checks of a watched page.
+    CREATE TABLE IF NOT EXISTS page_changes (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      pageId       INTEGER NOT NULL REFERENCES watch_pages(id) ON DELETE CASCADE,
+      detectedAt   TEXT NOT NULL DEFAULT (datetime('now')),
+      newLinks     TEXT NOT NULL DEFAULT '[]',  -- JSON PageLink[]
+      removedLinks TEXT NOT NULL DEFAULT '[]',
+      addedText    TEXT NOT NULL DEFAULT '[]',  -- JSON string[]
+      removedText  TEXT NOT NULL DEFAULT '[]',
+      fileChanged  INTEGER NOT NULL DEFAULT 0,  -- non-HTML document changed
+      reviewedAt   TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_watch_payer ON watch_pages(payerId);
+    CREATE INDEX IF NOT EXISTS idx_page_changes_page ON page_changes(pageId);
   `);
 }
 
@@ -159,6 +189,18 @@ function seed(db: Database.Database) {
     ];
 
     const payerIds = payers.map((p) => Number(insertPayer.run(p).lastInsertRowid));
+
+    // Watch each sample payer's policy page; the first check records a baseline.
+    const insertWatch = db.prepare("INSERT INTO watch_pages (payerId, url, label) VALUES (?, ?, ?)");
+    const watchLabels = [
+      "Policies & protocols",
+      "Clinical Policy Bulletins",
+      "Coverage policies",
+      "Medical coverage policies",
+      "Clinical guidelines",
+      "Medicare Coverage Database",
+    ];
+    payers.forEach((p, i) => insertWatch.run(payerIds[i], p.website, watchLabels[i]));
 
     // [payerIndex, policy fields, changes[]]
     const policies: Array<{
