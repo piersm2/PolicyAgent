@@ -9,7 +9,7 @@ export default function NotFound() {
         That policy or page doesn&apos;t exist. It may have been deleted.
       </p>
       <Link href="/" className="btn-primary mt-5">
-        Back to dashboard
+        Back to home
       </Link>
     </div>
   );

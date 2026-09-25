@@ -8,23 +8,18 @@ export default function PoliciesPage({
 }: {
   searchParams: { [key: string]: string | undefined };
 }) {
-  const payers = listPayers();
   const initialFilters = {
-    status: searchParams.status || "",
-    impact: searchParams.impact || "",
     payerId: searchParams.payerId || "",
     category: searchParams.category || "",
   };
   const initialPolicies = listPolicies({
-    status: initialFilters.status || undefined,
-    impact: initialFilters.impact || undefined,
     payerId: initialFilters.payerId ? Number(initialFilters.payerId) : undefined,
     category: initialFilters.category || undefined,
   });
 
   return (
     <PoliciesBrowser
-      payers={payers}
+      payers={listPayers()}
       initialPolicies={initialPolicies}
       initialFilters={initialFilters}
       openNew={searchParams.new === "1"}

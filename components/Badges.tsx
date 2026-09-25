@@ -1,10 +1,8 @@
-import type { Impact, PolicyStatus, ChangeType } from "@/lib/types";
+import type { Impact, PolicyStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<PolicyStatus, string> = {
   Active: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
   Upcoming: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
-  Draft: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
-  Retired: "bg-slate-100 text-slate-400 ring-1 ring-inset ring-slate-200 line-through",
 };
 
 export function StatusBadge({ status }: { status: PolicyStatus }) {
@@ -24,17 +22,6 @@ export function ImpactBadge({ impact }: { impact: Impact }) {
       {impact}
     </span>
   );
-}
-
-const CHANGE_STYLES: Record<ChangeType, string> = {
-  New: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
-  Revised: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
-  Retired: "bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200",
-  Reinstated: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
-};
-
-export function ChangeTypeBadge({ type }: { type: ChangeType }) {
-  return <span className={`badge ${CHANGE_STYLES[type]}`}>{type}</span>;
 }
 
 export function CategoryBadge({ category }: { category: string }) {

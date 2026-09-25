@@ -1,40 +1,21 @@
 import Link from "next/link";
-import { dashboardStats } from "@/lib/repo";
-import { CategoryBadge, ChangeTypeBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
-import { formatDate, relativeDays, daysFromToday } from "@/lib/format";
+import { getBoard } from "@/lib/board";
+import { ImpactBadge, StatusBadge } from "@/components/Badges";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function StatCard({
-  label,
-  value,
-  accent,
-  href,
-}: {
-  label: string;
-  value: number;
-  accent: string;
-  href: string;
-}) {
-  return (
-    <Link href={href} className="card p-4 transition hover:shadow-md">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 text-3xl font-bold ${accent}`}>{value}</div>
-    </Link>
-  );
-}
-
-export default function DashboardPage() {
-  const s = dashboardStats();
-  const maxCat = Math.max(1, ...s.byCategory.map((c) => c.count));
+export default function HomePage() {
+  const { counts, needsAttention, recentChanges } = getBoard();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Home</h1>
           <p className="text-sm text-slate-500">
-            Payer policy activity at a glance — what&apos;s changing and what needs attention.
+            {counts.policies} policies · {counts.upcoming} upcoming · {counts.highImpact} high impact ·{" "}
+            {counts.payers} payers
           </p>
         </div>
         <Link href="/policies?new=1" className="btn-primary">
@@ -42,140 +23,68 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatCard label="Total Policies" value={s.totalPolicies} accent="text-slate-900" href="/policies" />
-        <StatCard label="Active" value={s.activePolicies} accent="text-emerald-600" href="/policies?status=Active" />
-        <StatCard label="Upcoming" value={s.upcomingPolicies} accent="text-amber-600" href="/policies?status=Upcoming" />
-        <StatCard label="High Impact" value={s.highImpact} accent="text-red-600" href="/policies?impact=High" />
-        <StatCard label="Payers" value={s.totalPayers} accent="text-brand-600" href="/payers" />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Upcoming effective dates */}
-        <section className="card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Effective within 90 days</h2>
-            <span className="badge bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">
-              {s.upcomingEffective.length}
-            </span>
-          </div>
-          {s.upcomingEffective.length === 0 ? (
-            <EmptyLine text="No policies taking effect in the next 90 days." />
+      <div className="grid gap-6 lg:grid-cols-5">
+        <section className="card p-5 lg:col-span-3">
+          <h2 className="font-semibold text-slate-900">Needs attention</h2>
+          <p className="mb-4 text-xs text-slate-500">Ranked by impact, upcoming dates, and recent changes.</p>
+          {needsAttention.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No policies yet. Add one to get started.</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {s.upcomingEffective.map((p) => {
-                const days = daysFromToday(p.effectiveDate);
-                return (
-                  <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <Link href={`/policies/${p.id}`} className="block truncate font-medium text-slate-800 hover:text-brand-700">
+            <ol className="space-y-4">
+              {needsAttention.map((p, i) => (
+                <li key={p.id} className="flex gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/policies/${p.id}`} className="font-medium text-slate-800 hover:text-brand-700">
                         {p.title}
                       </Link>
-                      <div className="text-xs text-slate-500">
-                        {p.payerName} · {p.category}
-                      </div>
+                      <StatusBadge status={p.status} />
+                      <ImpactBadge impact={p.impact} />
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-medium text-slate-800">{formatDate(p.effectiveDate)}</div>
-                      <div className={`text-xs ${days !== null && days <= 30 ? "font-semibold text-amber-600" : "text-slate-400"}`}>
-                        {relativeDays(p.effectiveDate)}
-                      </div>
+                    <div className="text-xs text-slate-500">
+                      {p.payerName} · {p.category}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {p.reasons.map((r) => (
+                        <span
+                          key={r}
+                          className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500 ring-1 ring-inset ring-slate-200"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
         </section>
 
-        {/* Review due */}
-        <section className="card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Review due</h2>
-            <span className="badge bg-red-50 text-red-700 ring-1 ring-inset ring-red-200">
-              {s.reviewDue.length}
-            </span>
-          </div>
-          {s.reviewDue.length === 0 ? (
-            <EmptyLine text="Nothing due for review in the next 30 days." />
+        <section className="card p-5 lg:col-span-2">
+          <h2 className="mb-4 font-semibold text-slate-900">Recent changes</h2>
+          {recentChanges.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No changes logged yet.</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {s.reviewDue.map((p) => {
-                const days = daysFromToday(p.nextReviewDate);
-                const overdue = days !== null && days < 0;
-                return (
-                  <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <Link href={`/policies/${p.id}`} className="block truncate font-medium text-slate-800 hover:text-brand-700">
-                        {p.title}
-                      </Link>
-                      <div className="text-xs text-slate-500">{p.payerName}</div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-medium text-slate-800">{formatDate(p.nextReviewDate)}</div>
-                      <div className={`text-xs font-semibold ${overdue ? "text-red-600" : "text-amber-600"}`}>
-                        {overdue ? `overdue ${Math.abs(days!)}d` : relativeDays(p.nextReviewDate)}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent changes */}
-        <section className="card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Recent changes</h2>
-            <Link href="/changes" className="text-sm font-medium text-brand-600 hover:text-brand-700">
-              View all →
-            </Link>
-          </div>
-          <ul className="space-y-3">
-            {s.recentChanges.map((c) => (
-              <li key={c.id} className="flex gap-3">
-                <div className="mt-0.5">
-                  <ChangeTypeBadge type={c.changeType} />
-                </div>
-                <div className="min-w-0">
+            <ul className="space-y-3">
+              {recentChanges.map((c) => (
+                <li key={c.id}>
                   <div className="text-sm text-slate-800">{c.summary}</div>
                   <div className="text-xs text-slate-500">
-                    {c.payerName} · {c.policyTitle} · {formatDate(c.changeDate)}
+                    <Link href={`/policies/${c.policyId}`} className="hover:text-brand-700">
+                      {c.payerName} · {c.policyTitle}
+                    </Link>{" "}
+                    · {formatDate(c.changeDate)}
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* By category */}
-        <section className="card p-5">
-          <h2 className="mb-3 font-semibold text-slate-900">Policies by category</h2>
-          <ul className="space-y-2.5">
-            {s.byCategory.map((c) => (
-              <li key={c.category}>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{c.category}</span>
-                  <span className="font-medium text-slate-500">{c.count}</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-brand-500"
-                    style={{ width: `${(c.count / maxCat) * 100}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </div>
   );
-}
-
-function EmptyLine({ text }: { text: string }) {
-  return <p className="py-6 text-center text-sm text-slate-400">{text}</p>;
 }

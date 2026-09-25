@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiSend } from "@/lib/client";
-import { CHANGE_TYPES } from "@/lib/types";
 import { Modal } from "./Modal";
 import { todayLocal } from "@/lib/format";
 
@@ -14,10 +13,7 @@ export function AddChange({ policyId }: { policyId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     changeDate: todayLocal(),
-    changeType: "Revised",
-    version: "",
     summary: "",
-    notedBy: "",
   });
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -29,7 +25,7 @@ export function AddChange({ policyId }: { policyId: number }) {
     try {
       await apiSend(`/api/policies/${policyId}/changes`, "POST", form);
       setOpen(false);
-      setForm({ changeDate: todayLocal(), changeType: "Revised", version: "", summary: "", notedBy: "" });
+      setForm({ changeDate: todayLocal(), summary: "" });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -46,32 +42,12 @@ export function AddChange({ policyId }: { policyId: number }) {
       {open && (
         <Modal title="Log a policy change" onClose={() => setOpen(false)}>
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Date</label>
-                <input type="date" className="input" value={form.changeDate} onChange={(e) => set("changeDate", e.target.value)} />
-              </div>
-              <div>
-                <label className="label">Type</label>
-                <select className="input" value={form.changeType} onChange={(e) => set("changeType", e.target.value)}>
-                  {CHANGE_TYPES.map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Version</label>
-                <input className="input" value={form.version} onChange={(e) => set("version", e.target.value)} placeholder="e.g. v2.2" />
-              </div>
-              <div>
-                <label className="label">Noted by</label>
-                <input className="input" value={form.notedBy} onChange={(e) => set("notedBy", e.target.value)} placeholder="e.g. Policy Desk" />
-              </div>
+            <div>
+              <label className="label">Date</label>
+              <input type="date" className="input" value={form.changeDate} onChange={(e) => set("changeDate", e.target.value)} />
             </div>
             <div>
-              <label className="label">Summary *</label>
+              <label className="label">What changed *</label>
               <textarea
                 className="input min-h-[80px] resize-y"
                 required

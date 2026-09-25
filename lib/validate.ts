@@ -1,11 +1,4 @@
-import {
-  CHANGE_TYPES,
-  IMPACTS,
-  PAYER_TYPES,
-  POLICY_CATEGORIES,
-  POLICY_STATUSES,
-} from "./types";
-
+import { IMPACTS, PAYER_TYPES, POLICY_CATEGORIES } from "./types";
 import { safeHref, todayLocal } from "./format";
 
 export class ValidationError extends Error {
@@ -60,8 +53,6 @@ export function parsePayer(body: any) {
     name: required(body.name, "name"),
     type: oneOf(body.type, PAYER_TYPES, "type"),
     website: optUrl(body.website, "website"),
-    contact: str(body.contact),
-    notes: str(body.notes),
   };
 }
 
@@ -72,15 +63,11 @@ export function parsePolicy(body: any) {
   }
   return {
     payerId,
-    policyNumber: str(body.policyNumber),
     title: required(body.title, "title"),
     category: oneOf(body.category, POLICY_CATEGORIES, "category"),
-    status: oneOf(body.status ?? "Active", POLICY_STATUSES, "status"),
     impact: oneOf(body.impact ?? "Medium", IMPACTS, "impact"),
     effectiveDate: optDate(body.effectiveDate, "effectiveDate"),
-    endDate: optDate(body.endDate, "endDate"),
     nextReviewDate: optDate(body.nextReviewDate, "nextReviewDate"),
-    version: str(body.version),
     sourceUrl: optUrl(body.sourceUrl, "sourceUrl"),
     summary: str(body.summary),
   };
@@ -89,9 +76,6 @@ export function parsePolicy(body: any) {
 export function parseChange(body: any) {
   return {
     changeDate: optDate(body.changeDate, "changeDate") ?? todayLocal(),
-    changeType: oneOf(body.changeType ?? "Revised", CHANGE_TYPES, "changeType"),
-    version: str(body.version),
     summary: required(body.summary, "summary"),
-    notedBy: str(body.notedBy),
   };
 }
