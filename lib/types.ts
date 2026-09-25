@@ -40,57 +40,38 @@ export const POLICY_CATEGORIES: PolicyCategory[] = [
   "Pharmacy",
 ];
 
-export type PolicyStatus = "Active" | "Upcoming" | "Draft" | "Retired";
-
-export const POLICY_STATUSES: PolicyStatus[] = [
-  "Active",
-  "Upcoming",
-  "Draft",
-  "Retired",
-];
+// Status is derived from the effective date, never entered by hand:
+// a future effective date means Upcoming, otherwise Active.
+export type PolicyStatus = "Active" | "Upcoming";
 
 export type Impact = "High" | "Medium" | "Low";
 
 export const IMPACTS: Impact[] = ["High", "Medium", "Low"];
-
-export type ChangeType = "New" | "Revised" | "Retired" | "Reinstated";
-
-export const CHANGE_TYPES: ChangeType[] = [
-  "New",
-  "Revised",
-  "Retired",
-  "Reinstated",
-];
 
 export interface Payer {
   id: number;
   name: string;
   type: PayerType;
   website: string | null;
-  contact: string | null;
-  notes: string | null;
   createdAt: string;
 }
 
 export interface Policy {
   id: number;
   payerId: number;
-  policyNumber: string | null;
   title: string;
   category: PolicyCategory;
-  status: PolicyStatus;
   impact: Impact;
   effectiveDate: string | null; // ISO date (YYYY-MM-DD)
-  endDate: string | null;
   nextReviewDate: string | null;
-  version: string | null;
   sourceUrl: string | null;
-  summary: string | null;
+  summary: string | null; // shown as "Notes"
   createdAt: string;
   updatedAt: string;
 }
 
 export interface PolicyWithPayer extends Policy {
+  status: PolicyStatus;
   payerName: string;
   payerType: PayerType;
 }
@@ -99,36 +80,11 @@ export interface PolicyChange {
   id: number;
   policyId: number;
   changeDate: string; // ISO date
-  changeType: ChangeType;
-  version: string | null;
   summary: string;
-  notedBy: string | null;
   createdAt: string;
 }
 
 export interface PolicyChangeWithContext extends PolicyChange {
   policyTitle: string;
   payerName: string;
-}
-
-export interface Briefing {
-  id: number;
-  generatedAt: string;
-  source: "ai" | "rule";
-  model: string | null;
-  summary: string;
-  policyIds: number[];
-}
-
-export interface DashboardStats {
-  totalPolicies: number;
-  activePolicies: number;
-  upcomingPolicies: number;
-  highImpact: number;
-  totalPayers: number;
-  upcomingEffective: PolicyWithPayer[]; // effective within the next 90 days
-  reviewDue: PolicyWithPayer[]; // next review date in the past or within 30 days
-  recentChanges: PolicyChangeWithContext[];
-  byCategory: { category: string; count: number }[];
-  byPayer: { payerName: string; count: number }[];
 }

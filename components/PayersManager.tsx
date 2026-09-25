@@ -78,13 +78,11 @@ export function PayersManager({ initial }: { initial: PayerWithCount[] }) {
             </div>
 
             <div className="mt-3 space-y-1 text-xs text-slate-500">
-              {p.contact && <div>☎ {p.contact}</div>}
               {safeHref(p.website) && (
                 <a href={safeHref(p.website)!} target="_blank" rel="noreferrer" className="block truncate text-brand-600 hover:underline">
                   {p.website!.replace(/^https?:\/\//, "")}
                 </a>
               )}
-              {p.notes && <p className="pt-1 text-slate-500">{p.notes}</p>}
             </div>
 
             <div className="mt-4 flex items-center gap-1 border-t border-slate-100 pt-3">
@@ -141,8 +139,6 @@ function PayerForm({
     name: initial?.name ?? "",
     type: initial?.type ?? PAYER_TYPES[0],
     website: initial?.website ?? "",
-    contact: initial?.contact ?? "",
-    notes: initial?.notes ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -178,19 +174,9 @@ function PayerForm({
             ))}
           </select>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Website</label>
-            <input className="input" value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://…" />
-          </div>
-          <div>
-            <label className="label">Contact</label>
-            <input className="input" value={form.contact} onChange={(e) => set("contact", e.target.value)} placeholder="Provider services…" />
-          </div>
-        </div>
         <div>
-          <label className="label">Notes</label>
-          <textarea className="input min-h-[70px] resize-y" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+          <label className="label">Website</label>
+          <input className="input" value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://…" />
         </div>
         {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
         <div className="flex justify-end gap-2">

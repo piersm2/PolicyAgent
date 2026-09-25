@@ -1,8 +1,6 @@
 import { getDb } from "./db";
 import { ValidationError } from "./validate";
 import type {
-  Briefing,
-  DashboardStats,
   Payer,
   Policy,
   PolicyChange,
@@ -13,6 +11,8 @@ import type {
 // ---------------------------------------------------------------------------
 // Payers
 // ---------------------------------------------------------------------------
+type PayerInput = Omit<Payer, "id" | "createdAt">;
+
 export function listPayers(): Payer[] {
   return getDb().prepare("SELECT * FROM payers ORDER BY name COLLATE NOCASE").all() as Payer[];
 }
@@ -33,37 +33,19 @@ export function listPayersWithCounts(): (Payer & { policyCount: number })[] {
     .all() as (Payer & { policyCount: number })[];
 }
 
-export function createPayer(input: Omit<Payer, "id" | "createdAt">): Payer {
+export function createPayer(input: PayerInput): Payer {
   const info = getDb()
-    .prepare(
-      `INSERT INTO payers (name, type, website, contact, notes)
-       VALUES (@name, @type, @website, @contact, @notes)`
-    )
-    .run({
-      name: input.name,
-      type: input.type,
-      website: input.website ?? null,
-      contact: input.contact ?? null,
-      notes: input.notes ?? null,
-    });
+    .prepare("INSERT INTO payers (name, type, website) VALUES (@name, @type, @website)")
+    .run({ name: input.name, type: input.type, website: input.website ?? null });
   return getPayer(Number(info.lastInsertRowid))!;
 }
 
 // PUT semantics: the input replaces every editable field.
-export function updatePayer(id: number, input: Omit<Payer, "id" | "createdAt">): Payer | undefined {
+export function updatePayer(id: number, input: PayerInput): Payer | undefined {
   if (!getPayer(id)) return undefined;
   getDb()
-    .prepare(
-      `UPDATE payers SET name=@name, type=@type, website=@website, contact=@contact, notes=@notes WHERE id=@id`
-    )
-    .run({
-      id,
-      name: input.name,
-      type: input.type,
-      website: input.website ?? null,
-      contact: input.contact ?? null,
-      notes: input.notes ?? null,
-    });
+    .prepare("UPDATE payers SET name=@name, type=@type, website=@website WHERE id=@id")
+    .run({ id, name: input.name, type: input.type, website: input.website ?? null });
   return getPayer(id);
 }
 
@@ -74,8 +56,16 @@ export function deletePayer(id: number): boolean {
 // ---------------------------------------------------------------------------
 // Policies
 // ---------------------------------------------------------------------------
+
+// Status isn't stored: a future effective date means Upcoming, otherwise Active.
+const STATUS_SQL = `CASE WHEN p.effectiveDate IS NOT NULL AND date(p.effectiveDate) > date('now')
+  THEN 'Upcoming' ELSE 'Active' END`;
+
 const POLICY_SELECT = `
-  SELECT p.*, pay.name AS payerName, pay.type AS payerType
+  SELECT p.id, p.payerId, p.title, p.category, p.impact, p.effectiveDate,
+         p.nextReviewDate, p.sourceUrl, p.summary, p.createdAt, p.updatedAt,
+         ${STATUS_SQL} AS status,
+         pay.name AS payerName, pay.type AS payerType
   FROM policies p
   JOIN payers pay ON pay.id = p.payerId
 `;
@@ -84,8 +74,6 @@ export interface PolicyFilter {
   search?: string;
   payerId?: number;
   category?: string;
-  status?: string;
-  impact?: string;
 }
 
 export function listPolicies(filter: PolicyFilter = {}): PolicyWithPayer[] {
@@ -93,7 +81,7 @@ export function listPolicies(filter: PolicyFilter = {}): PolicyWithPayer[] {
   const params: Record<string, unknown> = {};
 
   if (filter.search) {
-    where.push("(p.title LIKE @search OR p.policyNumber LIKE @search OR p.summary LIKE @search)");
+    where.push("(p.title LIKE @search OR p.summary LIKE @search)");
     params.search = `%${filter.search}%`;
   }
   if (filter.payerId) {
@@ -104,20 +92,12 @@ export function listPolicies(filter: PolicyFilter = {}): PolicyWithPayer[] {
     where.push("p.category = @category");
     params.category = filter.category;
   }
-  if (filter.status) {
-    where.push("p.status = @status");
-    params.status = filter.status;
-  }
-  if (filter.impact) {
-    where.push("p.impact = @impact");
-    params.impact = filter.impact;
-  }
 
   const sql =
     POLICY_SELECT +
     (where.length ? ` WHERE ${where.join(" AND ")}` : "") +
     ` ORDER BY
-        CASE p.status WHEN 'Upcoming' THEN 0 WHEN 'Active' THEN 1 WHEN 'Draft' THEN 2 ELSE 3 END,
+        CASE ${STATUS_SQL} WHEN 'Upcoming' THEN 0 ELSE 1 END,
         CASE p.impact WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END,
         p.effectiveDate DESC`;
 
@@ -135,9 +115,9 @@ export function createPolicy(input: PolicyInput): PolicyWithPayer {
   const info = getDb()
     .prepare(
       `INSERT INTO policies
-        (payerId, policyNumber, title, category, status, impact, effectiveDate, endDate, nextReviewDate, version, sourceUrl, summary)
+        (payerId, title, category, impact, effectiveDate, nextReviewDate, sourceUrl, summary)
        VALUES
-        (@payerId, @policyNumber, @title, @category, @status, @impact, @effectiveDate, @endDate, @nextReviewDate, @version, @sourceUrl, @summary)`
+        (@payerId, @title, @category, @impact, @effectiveDate, @nextReviewDate, @sourceUrl, @summary)`
     )
     .run(normalizePolicy(input));
   return getPolicy(Number(info.lastInsertRowid))!;
@@ -150,10 +130,9 @@ export function updatePolicy(id: number, input: PolicyInput): PolicyWithPayer | 
   getDb()
     .prepare(
       `UPDATE policies SET
-        payerId=@payerId, policyNumber=@policyNumber, title=@title, category=@category,
-        status=@status, impact=@impact, effectiveDate=@effectiveDate, endDate=@endDate,
-        nextReviewDate=@nextReviewDate, version=@version, sourceUrl=@sourceUrl, summary=@summary,
-        updatedAt=datetime('now')
+        payerId=@payerId, title=@title, category=@category, impact=@impact,
+        effectiveDate=@effectiveDate, nextReviewDate=@nextReviewDate,
+        sourceUrl=@sourceUrl, summary=@summary, updatedAt=datetime('now')
        WHERE id=@id`
     )
     .run({ id, ...normalizePolicy(input) });
@@ -171,15 +150,11 @@ function assertPayerExists(payerId: number) {
 function normalizePolicy(input: PolicyInput) {
   return {
     payerId: input.payerId,
-    policyNumber: input.policyNumber ?? null,
     title: input.title,
     category: input.category,
-    status: input.status,
     impact: input.impact,
     effectiveDate: input.effectiveDate || null,
-    endDate: input.endDate || null,
     nextReviewDate: input.nextReviewDate || null,
-    version: input.version ?? null,
     sourceUrl: input.sourceUrl ?? null,
     summary: input.summary ?? null,
   };
@@ -194,7 +169,7 @@ export function listChangesForPolicy(policyId: number): PolicyChange[] {
     .all(policyId) as PolicyChange[];
 }
 
-export function recentChanges(limit = 15): PolicyChangeWithContext[] {
+export function recentChanges(limit: number): PolicyChangeWithContext[] {
   return getDb()
     .prepare(
       `SELECT c.*, p.title AS policyTitle, pay.name AS payerName
@@ -207,23 +182,11 @@ export function recentChanges(limit = 15): PolicyChangeWithContext[] {
     .all(limit) as PolicyChangeWithContext[];
 }
 
-export function createChange(
-  input: Omit<PolicyChange, "id" | "createdAt">
-): PolicyChange {
+export function createChange(input: Omit<PolicyChange, "id" | "createdAt">): PolicyChange {
   const db = getDb();
   const info = db
-    .prepare(
-      `INSERT INTO policy_changes (policyId, changeDate, changeType, version, summary, notedBy)
-       VALUES (@policyId, @changeDate, @changeType, @version, @summary, @notedBy)`
-    )
-    .run({
-      policyId: input.policyId,
-      changeDate: input.changeDate,
-      changeType: input.changeType,
-      version: input.version ?? null,
-      summary: input.summary,
-      notedBy: input.notedBy ?? null,
-    });
+    .prepare("INSERT INTO policy_changes (policyId, changeDate, summary) VALUES (@policyId, @changeDate, @summary)")
+    .run(input);
   // Touch the parent policy's updatedAt so lists reflect the activity.
   db.prepare("UPDATE policies SET updatedAt = datetime('now') WHERE id = ?").run(input.policyId);
   return db.prepare("SELECT * FROM policy_changes WHERE id = ?").get(Number(info.lastInsertRowid)) as PolicyChange;
@@ -248,101 +211,6 @@ export function latestPastChangeByPolicy(): Map<number, PolicyChange> {
   return new Map(rows.map((c) => [c.policyId, c]));
 }
 
-// ---------------------------------------------------------------------------
-// Briefings (stored/logged AI or rule-based summaries)
-// ---------------------------------------------------------------------------
-function rowToBriefing(row: any): Briefing {
-  return { ...row, policyIds: JSON.parse(row.policyIds || "[]") };
-}
-
-export function storeBriefing(input: Omit<Briefing, "id" | "generatedAt">): Briefing {
-  const info = getDb()
-    .prepare(
-      `INSERT INTO briefings (source, model, summary, policyIds)
-       VALUES (@source, @model, @summary, @policyIds)`
-    )
-    .run({
-      source: input.source,
-      model: input.model ?? null,
-      summary: input.summary,
-      policyIds: JSON.stringify(input.policyIds ?? []),
-    });
-  return getBriefing(Number(info.lastInsertRowid))!;
-}
-
-export function getBriefing(id: number): Briefing | undefined {
-  const row = getDb().prepare("SELECT * FROM briefings WHERE id = ?").get(id);
-  return row ? rowToBriefing(row) : undefined;
-}
-
-export function listBriefings(limit = 20): Briefing[] {
-  return (
-    getDb()
-      .prepare("SELECT * FROM briefings ORDER BY id DESC LIMIT ?")
-      .all(limit) as any[]
-  ).map(rowToBriefing);
-}
-
-// ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
-export function dashboardStats(): DashboardStats {
-  const db = getDb();
-  const n = (sql: string, ...args: unknown[]) =>
-    (db.prepare(sql).get(...args) as { n: number }).n;
-
-  const totalPolicies = n("SELECT COUNT(*) AS n FROM policies");
-  const activePolicies = n("SELECT COUNT(*) AS n FROM policies WHERE status = 'Active'");
-  const upcomingPolicies = n("SELECT COUNT(*) AS n FROM policies WHERE status = 'Upcoming'");
-  const highImpact = n(
-    "SELECT COUNT(*) AS n FROM policies WHERE impact = 'High' AND status IN ('Active','Upcoming')"
-  );
-  const totalPayers = n("SELECT COUNT(*) AS n FROM payers");
-
-  const upcomingEffective = db
-    .prepare(
-      POLICY_SELECT +
-        ` WHERE p.effectiveDate IS NOT NULL
-            AND date(p.effectiveDate) >= date('now')
-            AND date(p.effectiveDate) <= date('now', '+90 day')
-          ORDER BY date(p.effectiveDate) ASC`
-    )
-    .all() as PolicyWithPayer[];
-
-  const reviewDue = db
-    .prepare(
-      POLICY_SELECT +
-        ` WHERE p.nextReviewDate IS NOT NULL
-            AND p.status IN ('Active','Upcoming')
-            AND date(p.nextReviewDate) <= date('now', '+30 day')
-          ORDER BY date(p.nextReviewDate) ASC`
-    )
-    .all() as PolicyWithPayer[];
-
-  const byCategory = db
-    .prepare(
-      "SELECT category, COUNT(*) AS count FROM policies GROUP BY category ORDER BY count DESC"
-    )
-    .all() as { category: string; count: number }[];
-
-  const byPayer = db
-    .prepare(
-      `SELECT pay.name AS payerName, COUNT(*) AS count
-       FROM policies p JOIN payers pay ON pay.id = p.payerId
-       GROUP BY pay.id ORDER BY count DESC`
-    )
-    .all() as { payerName: string; count: number }[];
-
-  return {
-    totalPolicies,
-    activePolicies,
-    upcomingPolicies,
-    highImpact,
-    totalPayers,
-    upcomingEffective,
-    reviewDue,
-    recentChanges: recentChanges(8),
-    byCategory,
-    byPayer,
-  };
+export function countPayers(): number {
+  return (getDb().prepare("SELECT COUNT(*) AS n FROM payers").get() as { n: number }).n;
 }

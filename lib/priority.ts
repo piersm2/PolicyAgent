@@ -2,11 +2,7 @@ import type { PolicyChange, PolicyWithPayer } from "./types";
 import { daysFromToday } from "./format";
 
 // A ranked, explained view of which policies most need attention right now.
-// Deterministic — no external calls — so it works with zero configuration and
-// gives the AI summary a stable, factual base to write from.
-
-/** How many top-ranked policies the briefing covers (queue and summary alike). */
-export const BRIEFING_SIZE = 6;
+// Deterministic, so the Home board and /api/board always agree.
 
 export interface RankedPolicy {
   policy: PolicyWithPayer;
@@ -15,12 +11,7 @@ export interface RankedPolicy {
 }
 
 const IMPACT_POINTS: Record<string, number> = { High: 40, Medium: 20, Low: 5 };
-const STATUS_POINTS: Record<string, number> = {
-  Upcoming: 25,
-  Active: 10,
-  Draft: 3,
-  Retired: 0,
-};
+const STATUS_POINTS: Record<string, number> = { Upcoming: 25, Active: 10 };
 // Categories that tend to hit reimbursement/denials hardest get a nudge.
 const CATEGORY_POINTS: Record<string, number> = {
   "Prior Authorization": 8,
@@ -33,11 +24,9 @@ export function rankPolicies(
   policies: PolicyWithPayer[],
   latestChange: Map<number, PolicyChange>
 ): RankedPolicy[] {
-  const ranked = policies
-    .filter((p) => p.status !== "Retired")
-    .map((p) => score(p, latestChange.get(p.id)));
-
-  return ranked.sort((a, b) => b.score - a.score);
+  return policies
+    .map((p) => score(p, latestChange.get(p.id)))
+    .sort((a, b) => b.score - a.score);
 }
 
 function score(policy: PolicyWithPayer, mostRecent: PolicyChange | undefined): RankedPolicy {
@@ -88,10 +77,10 @@ function score(policy: PolicyWithPayer, mostRecent: PolicyChange | undefined): R
     if (age !== null && age <= 0) {
       if (age >= -14) {
         score += 12;
-        reasons.push(`${mostRecent.changeType} ${describeAge(age)}`);
+        reasons.push(`Changed ${describeAge(age)}`);
       } else if (age >= -30) {
         score += 6;
-        reasons.push(`${mostRecent.changeType} ${describeAge(age)}`);
+        reasons.push(`Changed ${describeAge(age)}`);
       }
     }
   }

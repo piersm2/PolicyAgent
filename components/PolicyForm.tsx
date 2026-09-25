@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { Modal } from "./Modal";
 import { apiSend } from "@/lib/client";
-import {
-  IMPACTS,
-  POLICY_CATEGORIES,
-  POLICY_STATUSES,
-  type Payer,
-  type PolicyWithPayer,
-} from "@/lib/types";
+import { IMPACTS, POLICY_CATEGORIES, type Payer, type PolicyWithPayer } from "@/lib/types";
 
 type Props = {
   payers: Payer[];
@@ -23,14 +17,10 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
   const [form, setForm] = useState({
     payerId: initial?.payerId ?? payers[0]?.id ?? 0,
     title: initial?.title ?? "",
-    policyNumber: initial?.policyNumber ?? "",
     category: initial?.category ?? POLICY_CATEGORIES[0],
-    status: initial?.status ?? "Active",
     impact: initial?.impact ?? "Medium",
     effectiveDate: initial?.effectiveDate ?? "",
-    endDate: initial?.endDate ?? "",
     nextReviewDate: initial?.nextReviewDate ?? "",
-    version: initial?.version ?? "",
     sourceUrl: initial?.sourceUrl ?? "",
     summary: initial?.summary ?? "",
   });
@@ -44,11 +34,8 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      if (editing) {
-        await apiSend(`/api/policies/${initial!.id}`, "PUT", form);
-      } else {
-        await apiSend("/api/policies", "POST", form);
-      }
+      if (editing) await apiSend(`/api/policies/${initial!.id}`, "PUT", form);
+      else await apiSend("/api/policies", "POST", form);
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -58,7 +45,7 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
   }
 
   return (
-    <Modal title={editing ? "Edit policy" : "Add policy"} onClose={onClose} wide>
+    <Modal title={editing ? "Edit policy" : "Add policy"} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="label">Title *</label>
@@ -83,13 +70,6 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
             </select>
           </div>
           <div>
-            <label className="label">Policy #</label>
-            <input className="input" value={form.policyNumber} onChange={(e) => set("policyNumber", e.target.value)} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div>
             <label className="label">Category</label>
             <select className="input" value={form.category} onChange={(e) => set("category", e.target.value)}>
               {POLICY_CATEGORIES.map((c) => (
@@ -97,14 +77,9 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">Status</label>
-            <select className="input" value={form.status} onChange={(e) => set("status", e.target.value)}>
-              {POLICY_STATUSES.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="label">Impact</label>
             <select className="input" value={form.impact} onChange={(e) => set("impact", e.target.value)}>
@@ -113,41 +88,31 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="label">Effective date</label>
             <input type="date" className="input" value={form.effectiveDate} onChange={(e) => set("effectiveDate", e.target.value)} />
           </div>
           <div>
-            <label className="label">End date</label>
-            <input type="date" className="input" value={form.endDate} onChange={(e) => set("endDate", e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Next review</label>
+            <label className="label">Review date</label>
             <input type="date" className="input" value={form.nextReviewDate} onChange={(e) => set("nextReviewDate", e.target.value)} />
           </div>
         </div>
+        <p className="-mt-2 text-xs text-slate-400">
+          Status is automatic: Upcoming until the effective date, then Active.
+        </p>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Version</label>
-            <input className="input" value={form.version} onChange={(e) => set("version", e.target.value)} placeholder="e.g. v2.1" />
-          </div>
-          <div>
-            <label className="label">Source URL</label>
-            <input className="input" value={form.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://…" />
-          </div>
+        <div>
+          <label className="label">Link to policy</label>
+          <input className="input" value={form.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://…" />
         </div>
 
         <div>
-          <label className="label">Summary</label>
+          <label className="label">Notes</label>
           <textarea
             className="input min-h-[90px] resize-y"
             value={form.summary}
             onChange={(e) => set("summary", e.target.value)}
-            placeholder="What the policy does and why it matters for reimbursement…"
+            placeholder="What the policy does and why it matters…"
           />
         </div>
 

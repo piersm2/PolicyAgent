@@ -13,8 +13,6 @@ export async function GET(req: NextRequest) {
       search: sp.get("search") || undefined,
       payerId: payerId ? Number(payerId) : undefined,
       category: sp.get("category") || undefined,
-      status: sp.get("status") || undefined,
-      impact: sp.get("impact") || undefined,
     });
     return ok(policies);
   } catch (err) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPolicy, listChangesForPolicy } from "@/lib/repo";
-import { CategoryBadge, ChangeTypeBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
+import { CategoryBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
 import { AddChange } from "@/components/AddChange";
 import { formatDate, relativeDays, safeHref } from "@/lib/format";
 
@@ -44,8 +44,6 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
               <Link href={`/policies?payerId=${policy.payerId}`} className="hover:text-brand-700">
                 {policy.payerName}
               </Link>
-              {policy.policyNumber && <> · {policy.policyNumber}</>}
-              {policy.version && <> · {policy.version}</>}
             </div>
           </div>
           <div className="flex gap-2">
@@ -61,15 +59,14 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-700">{policy.summary}</p>
         )}
 
-        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
           <Field label="Effective date">
             {formatDate(policy.effectiveDate)}
             {policy.effectiveDate && (
               <span className="ml-1 text-xs text-slate-400">({relativeDays(policy.effectiveDate)})</span>
             )}
           </Field>
-          <Field label="End date">{formatDate(policy.endDate)}</Field>
-          <Field label="Next review">
+          <Field label="Review date">
             {formatDate(policy.nextReviewDate)}
             {policy.nextReviewDate && (
               <span className="ml-1 text-xs text-slate-400">({relativeDays(policy.nextReviewDate)})</span>
@@ -100,12 +97,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
             {changes.map((c) => (
               <li key={c.id} className="relative">
                 <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-brand-500 ring-2 ring-brand-100" />
-                <div className="flex flex-wrap items-center gap-2">
-                  <ChangeTypeBadge type={c.changeType} />
-                  <span className="text-sm font-medium text-slate-700">{formatDate(c.changeDate)}</span>
-                  {c.version && <span className="text-xs text-slate-400">{c.version}</span>}
-                  {c.notedBy && <span className="text-xs text-slate-400">· {c.notedBy}</span>}
-                </div>
+                <div className="text-sm font-medium text-slate-700">{formatDate(c.changeDate)}</div>
                 <p className="mt-1 text-sm text-slate-700">{c.summary}</p>
               </li>
             ))}

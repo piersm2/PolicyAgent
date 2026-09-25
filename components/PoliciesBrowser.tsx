@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { apiGet, apiSend } from "@/lib/client";
-import {
-  IMPACTS,
-  POLICY_CATEGORIES,
-  POLICY_STATUSES,
-  type Payer,
-  type PolicyWithPayer,
-} from "@/lib/types";
+import { POLICY_CATEGORIES, type Payer, type PolicyWithPayer } from "@/lib/types";
 import { CategoryBadge, ImpactBadge, StatusBadge } from "./Badges";
 import { PolicyForm } from "./PolicyForm";
 import { formatDate } from "@/lib/format";
@@ -18,8 +12,6 @@ type Filters = {
   search: string;
   payerId: string;
   category: string;
-  status: string;
-  impact: string;
 };
 
 export function PoliciesBrowser({
@@ -38,8 +30,6 @@ export function PoliciesBrowser({
     search: "",
     payerId: "",
     category: "",
-    status: "",
-    impact: "",
     ...initialFilters,
   });
   const [loading, setLoading] = useState(false);
@@ -52,8 +42,6 @@ export function PoliciesBrowser({
     if (filters.search) sp.set("search", filters.search);
     if (filters.payerId) sp.set("payerId", filters.payerId);
     if (filters.category) sp.set("category", filters.category);
-    if (filters.status) sp.set("status", filters.status);
-    if (filters.impact) sp.set("impact", filters.impact);
     return sp.toString();
   }, [filters]);
 
@@ -127,11 +115,11 @@ export function PoliciesBrowser({
 
       {/* Filters */}
       <div className="card p-3">
-        <div className="grid gap-2 md:grid-cols-6">
+        <div className="grid gap-2 md:grid-cols-4">
           <div className="md:col-span-2">
             <input
               className="input"
-              placeholder="Search title, number, summary…"
+              placeholder="Search title or notes…"
               value={filters.search}
               onChange={(e) => set("search", e.target.value)}
             />
@@ -150,23 +138,11 @@ export function PoliciesBrowser({
               <option key={c}>{c}</option>
             ))}
           </select>
-          <select className="input" value={filters.status} onChange={(e) => set("status", e.target.value)}>
-            <option value="">All statuses</option>
-            {POLICY_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <select className="input" value={filters.impact} onChange={(e) => set("impact", e.target.value)}>
-            <option value="">All impact</option>
-            {IMPACTS.map((i) => (
-              <option key={i}>{i}</option>
-            ))}
-          </select>
         </div>
         {activeFilterCount > 0 && (
           <button
             className="mt-2 text-xs font-medium text-brand-600 hover:text-brand-700"
-            onClick={() => setFilters({ search: "", payerId: "", category: "", status: "", impact: "" })}
+            onClick={() => setFilters({ search: "", payerId: "", category: "" })}
           >
             Clear filters
           </button>
@@ -195,7 +171,6 @@ export function PoliciesBrowser({
                     <Link href={`/policies/${p.id}`} className="font-medium text-slate-800 hover:text-brand-700">
                       {p.title}
                     </Link>
-                    {p.policyNumber && <div className="text-xs text-slate-400">{p.policyNumber}</div>}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{p.payerName}</td>
                   <td className="px-4 py-3">
