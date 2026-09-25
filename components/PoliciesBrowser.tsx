@@ -6,7 +6,7 @@ import { apiGet, apiSend } from "@/lib/client";
 import { POLICY_CATEGORIES, type Payer, type PolicyWithPayer } from "@/lib/types";
 import { CategoryBadge, ImpactBadge, StatusBadge } from "./Badges";
 import { PolicyForm } from "./PolicyForm";
-import { formatDate } from "@/lib/format";
+import { daysFromToday, formatDate } from "@/lib/format";
 
 type Filters = {
   search: string;
@@ -157,10 +157,10 @@ export function PoliciesBrowser({
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-semibold">Policy</th>
                 <th className="px-4 py-3 font-semibold">Payer</th>
-                <th className="px-4 py-3 font-semibold">Category</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Impact</th>
                 <th className="px-4 py-3 font-semibold">Effective</th>
+                <th className="px-4 py-3 font-semibold">Follow-up</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -171,11 +171,11 @@ export function PoliciesBrowser({
                     <Link href={`/policies/${p.id}`} className="font-medium text-slate-800 hover:text-brand-700">
                       {p.title}
                     </Link>
+                    <div className="mt-1">
+                      <CategoryBadge category={p.category} />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{p.payerName}</td>
-                  <td className="px-4 py-3">
-                    <CategoryBadge category={p.category} />
-                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={p.status} />
                   </td>
@@ -183,6 +183,16 @@ export function PoliciesBrowser({
                     <ImpactBadge impact={p.impact} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-slate-600">{formatDate(p.effectiveDate)}</td>
+                  <td className="max-w-[16rem] px-4 py-3 text-xs text-slate-600">
+                    {p.nextAction ? (
+                      <>
+                        <div className="line-clamp-2">{p.nextAction}</div>
+                        <FollowUpMeta owner={p.owner} due={p.actionDue} />
+                      </>
+                    ) : (
+                      <span className="text-slate-400">{p.owner ? `Owner: ${p.owner}` : "—"}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <button
@@ -226,6 +236,23 @@ export function PoliciesBrowser({
             load();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function FollowUpMeta({ owner, due }: { owner: string | null; due: string | null }) {
+  const days = daysFromToday(due);
+  const overdue = days !== null && days < 0;
+  return (
+    <div className="text-slate-400">
+      {owner || "Unassigned"}
+      {due && (
+        <span className={overdue ? "font-semibold text-red-600" : ""}>
+          {" "}
+          · due {formatDate(due)}
+          {overdue ? " (overdue)" : ""}
+        </span>
       )}
     </div>
   );

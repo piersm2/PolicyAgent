@@ -1,6 +1,9 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { addDays, today } from "./format";
+import { CATALOG, SAMPLE_POLICIES, catalogPage } from "./catalog";
+import { installCatalog } from "./catalog-install";
 
 // Single shared connection. Next.js dev reloads modules, so cache on globalThis.
 const DB_DIR = path.join(process.cwd(), "data");
@@ -32,8 +35,13 @@ function initSchema(db: Database.Database) {
       impact         TEXT NOT NULL DEFAULT 'Medium',
       effectiveDate  TEXT,
       nextReviewDate TEXT,
-      sourceUrl      TEXT,
+      sourceUrl      TEXT,           -- the policy's own document
       summary        TEXT,
+      reviewEveryMonths INTEGER NOT NULL DEFAULT 12,
+      lastReviewedAt TEXT,           -- date
+      owner          TEXT,
+      nextAction     TEXT,
+      actionDue      TEXT,           -- date
       createdAt      TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt      TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -53,6 +61,7 @@ function initSchema(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS watch_pages (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       payerId       INTEGER NOT NULL REFERENCES payers(id) ON DELETE CASCADE,
+      policyId      INTEGER REFERENCES policies(id) ON DELETE CASCADE, -- set when watching one policy's document
       url           TEXT NOT NULL,
       label         TEXT NOT NULL,
       lastCheckedAt TEXT,
@@ -81,7 +90,7 @@ function initSchema(db: Database.Database) {
   `);
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Fields removed when the app was simplified. Databases created by earlier
 // versions still have these columns; drop them so the current inserts work
@@ -106,6 +115,65 @@ function dropLegacyColumns(db: Database.Database) {
   })();
 }
 
+// Columns added after the first release, created in place on older databases
+// (CREATE TABLE IF NOT EXISTS never alters an existing table).
+const ADDED_COLUMNS: Record<string, [name: string, definition: string][]> = {
+  policies: [
+    ["reviewEveryMonths", "INTEGER NOT NULL DEFAULT 12"],
+    ["lastReviewedAt", "TEXT"],
+    ["owner", "TEXT"],
+    ["nextAction", "TEXT"],
+    ["actionDue", "TEXT"],
+  ],
+  watch_pages: [["policyId", "INTEGER REFERENCES policies(id) ON DELETE CASCADE"]],
+};
+
+function addNewColumns(db: Database.Database) {
+  db.transaction(() => {
+    for (const [table, columns] of Object.entries(ADDED_COLUMNS)) {
+      const existing = new Set(
+        (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name)
+      );
+      for (const [name, definition] of columns) {
+        if (!existing.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      }
+    }
+  })();
+}
+
+// Sample URLs from earlier versions that are dead (404) or only show
+// JavaScript-loaded content, mapped to verified catalog pages. Watch pages,
+// payer websites and policy links still pointing at them are repointed;
+// anything the user changed is left alone.
+const SAMPLE_URL_FIXES: { old: string; key: string; page: number }[] = [
+  { old: "https://www.uhcprovider.com/en/policies-protocols.html", key: "uhc-commercial", page: 0 },
+  { old: "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins.html", key: "aetna", page: 0 },
+  { old: "https://static.cigna.com/coverage-policies", key: "cigna", page: 0 },
+  { old: "https://www.humana.com/provider/medical-resources/clinical/policies", key: "humana-ma", page: 0 },
+  { old: "https://www.anthem.com/provider/policies/clinical-guidelines", key: "anthem-mo", page: 0 },
+  { old: "https://www.cms.gov/medicare-coverage-database", key: "cms-medicare", page: 0 },
+];
+
+function fixSampleUrls(db: Database.Database) {
+  const updateWatch = db.prepare(
+    `UPDATE watch_pages SET url = @url, label = @label, snapshot = NULL, lastError = NULL, lastNote = NULL,
+       lastCheckedAt = NULL, lastSuccessAt = NULL
+     WHERE url = @old AND policyId IS NULL`
+  );
+  const updateWebsite = db.prepare("UPDATE payers SET website = @website WHERE website = @old");
+  const updatePolicy = db.prepare("UPDATE policies SET sourceUrl = @url WHERE sourceUrl = @old");
+  db.transaction(() => {
+    for (const fix of SAMPLE_URL_FIXES) {
+      const { url, label } = catalogPage(fix.key, fix.page);
+      const website = CATALOG.find((c) => c.key === fix.key)!.website;
+      const params = { old: fix.old, url, label, website };
+      updateWatch.run(params);
+      updateWebsite.run(params);
+      updatePolicy.run(params);
+    }
+  })();
+}
+
 export function getDb(): Database.Database {
   if (global.__policyAgentDb) return global.__policyAgentDb;
 
@@ -114,307 +182,62 @@ export function getDb(): Database.Database {
   const db = new Database(DB_PATH);
   initSchema(db);
 
-  // user_version: 0 = brand-new file, 1 = earlier app version, 2 = current.
+  // user_version: 0 = brand-new file, 1-2 = earlier app versions, 3 = current.
   const version = db.pragma("user_version", { simple: true }) as number;
   if (version < SCHEMA_VERSION) {
     dropLegacyColumns(db);
+    addNewColumns(db);
+    if (version > 0) fixSampleUrls(db);
     // Seed only a brand-new database, so a user who deletes every payer
     // doesn't get the demo data back.
     const count = (db.prepare("SELECT COUNT(*) AS n FROM payers").get() as { n: number }).n;
     if (version === 0 && count === 0) seed(db);
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_watch_policy ON watch_pages(policyId)");
 
   global.__policyAgentDb = db;
   return db;
 }
 
 // ---------------------------------------------------------------------------
-// Seed data — realistic payers and policies for a hospital/provider RCM team.
+// Seed data — the Missouri payer catalog plus a few real policies, each
+// watching its own document. No change history is invented: it builds up as
+// the watcher and the team record changes.
 // ---------------------------------------------------------------------------
 function seed(db: Database.Database) {
-  const today = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const shift = (days: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + days);
-    return iso(d);
-  };
+  const start = today();
+  installCatalog(db, CATALOG.map((c) => c.key));
 
-  const insertPayer = db.prepare(
-    `INSERT INTO payers (name, type, website) VALUES (@name, @type, @website)`
-  );
+  const payerId = db.prepare("SELECT id FROM payers WHERE name = ?");
   const insertPolicy = db.prepare(
     `INSERT INTO policies
-      (payerId, title, category, impact, effectiveDate, nextReviewDate, sourceUrl, summary)
+      (payerId, title, category, impact, nextReviewDate, sourceUrl, summary, owner, nextAction, actionDue)
      VALUES
-      (@payerId, @title, @category, @impact, @effectiveDate, @nextReviewDate, @sourceUrl, @summary)`
+      (@payerId, @title, @category, @impact, @nextReviewDate, @sourceUrl, @summary, @owner, @nextAction, @actionDue)`
   );
-  const insertChange = db.prepare(
-    `INSERT INTO policy_changes (policyId, changeDate, summary) VALUES (@policyId, @changeDate, @summary)`
-  );
+  const insertWatch = db.prepare("INSERT INTO watch_pages (payerId, policyId, url, label) VALUES (?, ?, ?, ?)");
 
-  const tx = db.transaction(() => {
-    const payers = [
-      {
-        name: "UnitedHealthcare",
-        type: "Commercial",
-        website: "https://www.uhcprovider.com/en/policies-protocols.html",
-      },
-      {
-        name: "Aetna",
-        type: "Commercial",
-        website: "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins.html",
-      },
-      {
-        name: "Cigna Healthcare",
-        type: "Commercial",
-        website: "https://static.cigna.com/coverage-policies",
-      },
-      {
-        name: "Humana",
-        type: "Medicare Advantage",
-        website: "https://www.humana.com/provider/medical-resources/clinical/policies",
-      },
-      {
-        name: "Anthem Blue Cross Blue Shield",
-        type: "Commercial",
-        website: "https://www.anthem.com/provider/policies/clinical-guidelines",
-      },
-      {
-        name: "CMS — Medicare",
-        type: "Medicare (Traditional)",
-        website: "https://www.cms.gov/medicare-coverage-database",
-      },
-    ];
-
-    const payerIds = payers.map((p) => Number(insertPayer.run(p).lastInsertRowid));
-
-    // Watch each sample payer's policy page; the first check records a baseline.
-    const insertWatch = db.prepare("INSERT INTO watch_pages (payerId, url, label) VALUES (?, ?, ?)");
-    const watchLabels = [
-      "Policies & protocols",
-      "Clinical Policy Bulletins",
-      "Coverage policies",
-      "Medical coverage policies",
-      "Clinical guidelines",
-      "Medicare Coverage Database",
-    ];
-    payers.forEach((p, i) => insertWatch.run(payerIds[i], p.website, watchLabels[i]));
-
-    // [payerIndex, policy fields, changes[]]
-    const policies: Array<{
-      p: number;
-      policy: Record<string, unknown>;
-      changes: Array<Record<string, unknown>>;
-    }> = [
-      {
-        p: 0,
-        policy: {
-          title: "Site of Service — Outpatient Surgical Procedures",
-          category: "Reimbursement",
-          impact: "High",
-          effectiveDate: shift(35),
-          nextReviewDate: shift(200),
-          sourceUrl: "https://www.uhcprovider.com/en/policies-protocols.html",
-          summary:
-            "Select outpatient surgical procedures will require an approved site-of-service review before they are covered in a hospital outpatient department (HOPD). Redirects lower-acuity cases to ASC settings.",
-        },
-        changes: [
-          {
-            changeDate: shift(-5),
-            summary:
-              "Added 14 CPT codes to the site-of-service review list; effective date set 35 days out. HOPD claims without approval will deny CO-50.",
-          },
-          {
-            changeDate: shift(-190),
-            summary: "Initial site-of-service program launched for a limited musculoskeletal code set.",
-          },
-        ],
-      },
-      {
-        p: 0,
-        policy: {
-          title: "Modifier 25 — Significant, Separately Identifiable E/M",
-          category: "Billing & Coding",
-          impact: "Medium",
-          effectiveDate: shift(-120),
-          nextReviewDate: shift(20),
-          sourceUrl: "https://www.uhcprovider.com/en/policies-protocols.html",
-          summary:
-            "Reduces reimbursement for E/M services billed with modifier 25 on the same day as a minor procedure unless documentation supports a separately identifiable service.",
-        },
-        changes: [
-          {
-            changeDate: shift(-120),
-            summary: "Reimbursement reduction increased from 25% to 50% for flagged claims.",
-          },
-        ],
-      },
-      {
-        p: 1,
-        policy: {
-          title: "Continuous Glucose Monitoring (CGM) Devices",
-          category: "Medical Necessity",
-          impact: "Medium",
-          effectiveDate: shift(-60),
-          nextReviewDate: shift(120),
-          sourceUrl: "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins.html",
-          summary:
-            "Defines medical-necessity criteria for personal and professional CGM. Expanded eligibility to include certain Type 2 diabetes patients on basal insulin.",
-        },
-        changes: [
-          {
-            changeDate: shift(-60),
-            summary: "Broadened coverage to basal-insulin Type 2 patients; removed 4x/day testing precondition.",
-          },
-        ],
-      },
-      {
-        p: 1,
-        policy: {
-          title: "Prior Authorization — Advanced Imaging (MRI/CT/PET)",
-          category: "Prior Authorization",
-          impact: "High",
-          effectiveDate: shift(-240),
-          nextReviewDate: shift(-8),
-          sourceUrl: "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins.html",
-          summary:
-            "Outpatient advanced imaging requires prior authorization through the radiology benefit manager. Retro-authorization window is 2 business days for emergent studies.",
-        },
-        changes: [
-          {
-            changeDate: shift(-30),
-            summary: "Retro-auth window shortened from 5 to 2 business days for emergent imaging.",
-          },
-        ],
-      },
-      {
-        p: 2,
-        policy: {
-          title: "Skilled Nursing Facility — Level of Care",
-          category: "Coverage / Benefit",
-          impact: "Medium",
-          effectiveDate: shift(-400),
-          nextReviewDate: shift(45),
-          sourceUrl: "https://static.cigna.com/coverage-policies",
-          summary:
-            "Applies MCG criteria for SNF admission and continued-stay review. Concurrent review required every 3 days.",
-        },
-        changes: [
-          {
-            changeDate: shift(-14),
-            summary: "Adopted MCG 28th edition criteria for level-of-care determinations.",
-          },
-        ],
-      },
-      {
-        p: 2,
-        policy: {
-          title: "Telehealth — Coverage & Place of Service",
-          category: "Coverage / Benefit",
-          impact: "High",
-          effectiveDate: shift(70),
-          nextReviewDate: shift(300),
-          sourceUrl: "https://static.cigna.com/coverage-policies",
-          summary:
-            "Post-PHE telehealth coverage rules. Audio-only coverage narrowed; POS 10 required for home-based telehealth to receive non-facility rate.",
-        },
-        changes: [
-          {
-            changeDate: shift(-2),
-            summary:
-              "Announced 90-day notice: audio-only limited to behavioral health after effective date; POS 02 vs 10 distinction enforced.",
-          },
-        ],
-      },
-      {
-        p: 3,
-        policy: {
-          title: "Inpatient Admission — Two-Midnight Alignment",
-          category: "Medical Necessity",
-          impact: "High",
-          effectiveDate: shift(-90),
-          nextReviewDate: shift(10),
-          sourceUrl: "https://www.humana.com/provider/medical-resources/clinical/policies",
-          summary:
-            "Aligns MA inpatient decisions with the CMS two-midnight rule per the 2024 final rule. Observation vs inpatient status determinations follow CMS guidance.",
-        },
-        changes: [
-          {
-            changeDate: shift(-90),
-            summary: "Updated to reflect CMS 2024 MA final rule requiring two-midnight adherence.",
-          },
-        ],
-      },
-      {
-        p: 4,
-        policy: {
-          title: "Prior Authorization — Spinal Fusion (Lumbar)",
-          category: "Prior Authorization",
-          impact: "High",
-          effectiveDate: shift(-30),
-          nextReviewDate: shift(160),
-          sourceUrl: "https://www.anthem.com/provider/policies/clinical-guidelines",
-          summary:
-            "Lumbar fusion requires prior authorization via Carelon. Adds documentation requirements for 6 months of conservative therapy.",
-        },
-        changes: [
-          {
-            changeDate: shift(-30),
-            summary: "Conservative-care documentation extended from 3 to 6 months.",
-          },
-        ],
-      },
-      {
-        p: 5,
-        policy: {
-          title: "Implantable Cardioverter Defibrillators (ICDs)",
-          category: "Coverage / Benefit",
-          impact: "Medium",
-          effectiveDate: shift(-1000),
-          nextReviewDate: shift(80),
-          sourceUrl: "https://www.cms.gov/medicare-coverage-database",
-          summary:
-            "National Coverage Determination for ICDs. Registry participation requirement and indications per NCD 20.4.",
-        },
-        changes: [
-          {
-            changeDate: shift(-365),
-            summary: "Clarified shared decision-making documentation expectations.",
-          },
-        ],
-      },
-      {
-        p: 5,
-        policy: {
-          title: "Local Coverage — Wound Care & Debridement",
-          category: "Billing & Coding",
-          impact: "Medium",
-          effectiveDate: shift(21),
-          nextReviewDate: shift(220),
-          sourceUrl: "https://www.cms.gov/medicare-coverage-database",
-          summary:
-            "Local Coverage Determination revision tightening frequency limits and documentation for surgical debridement (CPT 11042-11047).",
-        },
-        changes: [
-          {
-            changeDate: shift(-3),
-            summary: "MAC posted revision R12 with 21-day notice; adds wound-measurement documentation requirement.",
-          },
-        ],
-      },
-    ];
-
-    for (const entry of policies) {
+  db.transaction(() => {
+    for (const sample of SAMPLE_POLICIES) {
+      const payer = CATALOG.find((c) => c.key === sample.payer)!;
+      const id = (payerId.get(payer.name) as { id: number }).id;
+      const extra = sample as { owner?: string; nextAction?: string; actionInDays?: number };
       const policyId = Number(
-        insertPolicy.run({ payerId: payerIds[entry.p], ...entry.policy }).lastInsertRowid
+        insertPolicy.run({
+          payerId: id,
+          title: sample.title,
+          category: sample.category,
+          impact: sample.impact,
+          nextReviewDate: addDays(start, sample.reviewInDays),
+          sourceUrl: sample.sourceUrl,
+          summary: sample.summary,
+          owner: extra.owner ?? null,
+          nextAction: extra.nextAction ?? null,
+          actionDue: extra.actionInDays === undefined ? null : addDays(start, extra.actionInDays),
+        }).lastInsertRowid
       );
-      for (const c of entry.changes) {
-        insertChange.run({ policyId, ...c });
-      }
+      insertWatch.run(id, policyId, sample.sourceUrl, `Policy document: ${sample.title}`);
     }
-  });
-
-  tx();
+  })();
 }

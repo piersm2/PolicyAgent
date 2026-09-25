@@ -2,12 +2,14 @@
   "name": "policyagent",
   "version": "1.0.0",
   "private": true,
-  "description": "Payer policy tracking app \u2014 track health-plan medical, reimbursement, and coverage policies, their effective dates, and change history.",
+  "description": "Payer policy tracking app — track health-plan medical, reimbursement, and coverage policies, their effective dates, and change history.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check-due": "tsx scripts/check-due.ts",
+    "check-links": "tsx scripts/check-links.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
@@ -24,6 +26,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.7",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.4"
   },
   "engines": {

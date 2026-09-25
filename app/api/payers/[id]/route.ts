@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { deletePayer, getPayer, updatePayer } from "@/lib/repo";
-import { parsePayer } from "@/lib/validate";
+import { parsePayer, parsePayerPages } from "@/lib/validate";
+import { addPayerPages } from "@/lib/catalog-install";
+import { getDb } from "@/lib/db";
 import { handleError, ok, parseId } from "@/lib/http";
 import { NextResponse } from "next/server";
 
@@ -19,9 +21,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
-    const updated = updatePayer(parseId(params.id), parsePayer(body));
+    const input = parsePayer(body);
+    const pages = parsePayerPages(body.pages);
+    const updated = updatePayer(parseId(params.id), input);
     if (!updated) return NextResponse.json({ error: "Payer not found." }, { status: 404 });
-    return ok(updated);
+    const pagesAdded = addPayerPages(getDb(), updated.id, pages);
+    return ok({ ...updated, pagesAdded });
   } catch (err) {
     return handleError(err);
   }

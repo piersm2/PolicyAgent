@@ -1,5 +1,5 @@
-import { IMPACTS, PAYER_TYPES, POLICY_CATEGORIES } from "./types";
-import { safeHref, todayLocal } from "./format";
+import { IMPACTS, PAYER_TYPES, POLICY_CATEGORIES, REVIEW_INTERVALS } from "./types";
+import { safeHref, today } from "./format";
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -56,6 +56,33 @@ export function parsePayer(body: any) {
   };
 }
 
+/**
+ * Policy pages entered on the payer form, one per line: "https://…" or
+ * "Label | https://…". Blank lines are skipped.
+ */
+export function parsePayerPages(v: unknown): { url: string; label: string }[] {
+  if (v === undefined || v === null || v === "") return [];
+  const lines = Array.isArray(v) ? v.map(String) : String(v).split(/\r?\n/);
+  const pages: { url: string; label: string }[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bar = line.lastIndexOf("|");
+    const url = (bar >= 0 ? line.slice(bar + 1) : line).trim();
+    if (!safeHref(url)) throw new ValidationError(`Policy page "${line}" must be an http:// or https:// URL.`);
+    const label = bar >= 0 ? line.slice(0, bar).trim() : "";
+    pages.push({ url, label: label || defaultLabel(url) });
+  }
+  return pages;
+}
+
+function defaultLabel(url: string): string {
+  const { hostname, pathname } = new URL(url);
+  const last = pathname.split("/").filter(Boolean).pop();
+  const name = last ? decodeURIComponent(last).replace(/\.[a-z]+$/i, "").replace(/[-_]+/g, " ") : hostname;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 export function parsePolicy(body: any) {
   const payerId = Number(body.payerId);
   if (!Number.isInteger(payerId) || payerId <= 0) {
@@ -70,12 +97,27 @@ export function parsePolicy(body: any) {
     nextReviewDate: optDate(body.nextReviewDate, "nextReviewDate"),
     sourceUrl: optUrl(body.sourceUrl, "sourceUrl"),
     summary: str(body.summary),
+    reviewEveryMonths: reviewInterval(body.reviewEveryMonths),
+    owner: str(body.owner),
+    nextAction: str(body.nextAction),
+    actionDue: optDate(body.actionDue, "actionDue"),
+    // Default on: a policy with a document link is watched unless told otherwise.
+    watchDocument: body.watchDocument === undefined ? true : Boolean(body.watchDocument),
   };
+}
+
+function reviewInterval(v: unknown): number {
+  if (v === undefined || v === null || v === "") return 12;
+  const n = Number(v);
+  if (!(REVIEW_INTERVALS as readonly number[]).includes(n)) {
+    throw new ValidationError(`"reviewEveryMonths" must be one of: ${REVIEW_INTERVALS.join(", ")}.`);
+  }
+  return n;
 }
 
 export function parseChange(body: any) {
   return {
-    changeDate: optDate(body.changeDate, "changeDate") ?? todayLocal(),
+    changeDate: optDate(body.changeDate, "changeDate") ?? today(),
     summary: required(body.summary, "summary"),
   };
 }

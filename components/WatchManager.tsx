@@ -64,8 +64,8 @@ export function WatchManager({
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Watch list</h1>
           <p className="text-sm text-slate-500">
-            Payer pages checked for new documents and wording changes every {checkEveryHours} hours while the app
-            is running.
+            Payer pages and policy documents checked for changes every {checkEveryHours} hours while the app is
+            running. In a codespace, the “Scheduled payer check” GitHub Action wakes it daily (see the README).
           </p>
         </div>
         <div className="flex gap-2">
@@ -93,9 +93,20 @@ export function WatchManager({
             <div key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-slate-800">
-                    {p.payerName} — {p.label}
-                  </span>
+                  {p.policyId ? (
+                    <a href={`/policies/${p.policyId}`} className="font-medium text-slate-800 hover:text-brand-700">
+                      {p.payerName} — {p.policyTitle}
+                    </a>
+                  ) : (
+                    <span className="font-medium text-slate-800">
+                      {p.payerName} — {p.label}
+                    </span>
+                  )}
+                  {p.policyId && (
+                    <span className="badge bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200">
+                      Policy document
+                    </span>
+                  )}
                   {p.unreviewedChanges > 0 && (
                     <span className="badge bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">
                       {p.unreviewedChanges} to review

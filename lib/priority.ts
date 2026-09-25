@@ -22,16 +22,34 @@ const CATEGORY_POINTS: Record<string, number> = {
 
 export function rankPolicies(
   policies: PolicyWithPayer[],
-  latestChange: Map<number, PolicyChange>
+  latestChange: Map<number, PolicyChange>,
+  changedDocuments: Set<number> = new Set()
 ): RankedPolicy[] {
   return policies
-    .map((p) => score(p, latestChange.get(p.id)))
+    .map((p) => score(p, latestChange.get(p.id), changedDocuments.has(p.id)))
     .sort((a, b) => b.score - a.score);
 }
 
-function score(policy: PolicyWithPayer, mostRecent: PolicyChange | undefined): RankedPolicy {
+function score(policy: PolicyWithPayer, mostRecent: PolicyChange | undefined, documentChanged: boolean): RankedPolicy {
   let score = 0;
   const reasons: string[] = [];
+
+  if (documentChanged) {
+    score += 25;
+    reasons.push("Policy document changed (not reviewed)");
+  }
+
+  // Open follow-up work.
+  if (policy.nextAction) {
+    const toDue = daysFromToday(policy.actionDue);
+    if (toDue !== null && toDue < 0) {
+      score += 20;
+      reasons.push(`Action overdue by ${Math.abs(toDue)} day${toDue === -1 ? "" : "s"}`);
+    } else if (toDue !== null && toDue <= 7) {
+      score += 10;
+      reasons.push(toDue === 0 ? "Action due today" : `Action due in ${toDue} day${toDue === 1 ? "" : "s"}`);
+    }
+  }
 
   score += IMPACT_POINTS[policy.impact] ?? 0;
   if (policy.impact === "High") reasons.push("High operational/financial impact");

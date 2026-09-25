@@ -8,6 +8,7 @@ import type { PageLink } from "./types";
 export interface Snapshot {
   kind: "html" | "file"; // "file" = PDF or other non-HTML document
   hash: string;
+  finalUrl: string; // after redirects
   lines: string[];
   links: PageLink[];
   // Set when the page may not have loaded fully (e.g. built by JavaScript).
@@ -46,7 +47,7 @@ export async function fetchSnapshot(url: string): Promise<Snapshot> {
   const contentType = res.headers.get("content-type") ?? "";
   if (!/html|xml/i.test(contentType)) {
     // PDFs and other documents: detect changes by content hash only.
-    return { kind: "file", hash: sha256(body), lines: [], links: [], note: null };
+    return { kind: "file", hash: sha256(body), finalUrl: res.url || url, lines: [], links: [], note: null };
   }
   return parseHtml(body.toString("utf8"), res.url || url);
 }
@@ -73,8 +74,7 @@ export function parseHtml(html: string, baseUrl: string): Snapshot {
       return;
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return;
-    url.hash = "";
-    const key = url.toString();
+    const key = normalizeLinkUrl(url.toString());
     if (!links.has(key)) links.set(key, { url: key, text: clean($(el).text()).slice(0, 200) || key });
   });
 
@@ -92,10 +92,36 @@ export function parseHtml(html: string, baseUrl: string): Snapshot {
   return {
     kind: "html",
     hash: sha256(JSON.stringify([sortedLines, sortedLinks.map((l) => l.url)])),
+    finalUrl: baseUrl,
     lines: sortedLines,
     links: sortedLinks,
     note,
   };
+}
+
+// Query parameters sites add to bust caches (e.g. CMS "?t=1727..."); they change on
+// every page load without the linked document changing. "v" is deliberately kept:
+// sites such as Healthy Blue use ?v=<date> as the document's version, so a new
+// value there means the document really changed.
+const CACHE_BUSTING_PARAMS = new Set([
+  "t", "ts", "_", "_t", "cb", "cache", "cachebust", "cachebuster", "nocache",
+  "timestamp", "rnd", "rand", "random", "bust",
+]);
+
+/** Canonical form of a link for comparing snapshots: no fragment, no cache-busting params. */
+export function normalizeLinkUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return raw;
+  }
+  url.hash = "";
+  const kept = Array.from(url.searchParams.entries())
+    .filter(([key]) => !CACHE_BUSTING_PARAMS.has(key.toLowerCase()))
+    .sort(([a], [b]) => a.localeCompare(b));
+  url.search = new URLSearchParams(kept).toString();
+  return url.toString();
 }
 
 function clean(text: string): string {

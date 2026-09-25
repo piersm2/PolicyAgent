@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compileFeed, feedToMarkdown } from "@/lib/feed";
 import { handleError } from "@/lib/http";
+import { publicOrigin } from "@/lib/origin";
 
 export const dynamic = "force-dynamic";
 
 // The compiled feed. JSON by default; ?format=md returns readable text.
 export async function GET(req: NextRequest) {
   try {
-    const origin = req.nextUrl.origin;
+    const origin = publicOrigin(req);
     const feed = compileFeed(origin);
     if (req.nextUrl.searchParams.get("format") === "md") {
       // text/plain so browsers display it instead of downloading it.
