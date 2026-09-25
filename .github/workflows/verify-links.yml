@@ -1,0 +1,30 @@
+name: Verify payer links
+
+# Checks payer policy URLs from GitHub's network (the same view the watcher has).
+on:
+  push:
+    paths:
+      - "scripts/check-links.ts"
+      - "scripts/link-candidates.json"
+      - "lib/catalog.ts"
+      - "lib/extract.ts"
+      - ".github/workflows/verify-links.yml"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check candidate links
+        if: hashFiles('scripts/link-candidates.json') != ''
+        run: npx tsx scripts/check-links.ts scripts/link-candidates.json
+      - name: Check catalog links
+        if: hashFiles('lib/catalog.ts') != ''
+        run: npx tsx scripts/check-links.ts

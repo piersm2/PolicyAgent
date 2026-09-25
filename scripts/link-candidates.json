@@ -1,0 +1,215 @@
+[
+ {
+  "label": "Cigna latest updates",
+  "url": "https://static.cigna.com/assets/chcp/resourceLibrary/coveragePolicies/latestUpdatesListing.html",
+  "explore": true
+ },
+ {
+  "label": "Cigna coverage policies index",
+  "url": "https://static.cigna.com/assets/chcp/resourceLibrary/coveragePolicies/index.html",
+  "explore": true
+ },
+ {
+  "label": "Cigna medical A-Z",
+  "url": "https://static.cigna.com/assets/chcp/resourceLibrary/coveragePolicies/medical_a-z.html"
+ },
+ {
+  "label": "Cigna reimbursement/payment",
+  "url": "https://static.cigna.com/assets/chcp/resourceLibrary/clinicalReimbursementPayment/clinReimAndPayPolsListing.html"
+ },
+ {
+  "label": "Cigna policies landing",
+  "url": "https://www.cigna.com/health-care-providers/coverage-and-claims/policies/"
+ },
+ {
+  "label": "Humana MCP home",
+  "url": "https://mcp.humana.com/tad/tad_new/home.aspx?type=provider",
+  "explore": true
+ },
+ {
+  "label": "Humana MCP medical by effective date",
+  "url": "https://mcp.humana.com/tad/tad_new/Search.aspx?sortfield=effectivedate&policyType=medical",
+  "explore": true
+ },
+ {
+  "label": "Humana claims payment policy updates",
+  "url": "https://www.humana.com/provider/news/claims-payment-policy-updates",
+  "explore": true
+ },
+ {
+  "label": "Humana claims payment policies",
+  "url": "https://provider.humana.com/coverage-claims/claims-payment-policies",
+  "explore": true
+ },
+ {
+  "label": "Humana coverage-claims",
+  "url": "https://provider.humana.com/coverage-claims",
+  "explore": true
+ },
+ {
+  "label": "Humana MA materials",
+  "url": "https://provider.humana.com/working-with-us/medicare-advantage-materials",
+  "explore": true
+ },
+ {
+  "label": "UHC policies landing",
+  "url": "https://www.uhcprovider.com/en/policies-protocols.html"
+ },
+ {
+  "label": "UHC commercial medical & drug",
+  "url": "https://www.uhcprovider.com/en/policies-protocols/commercial-policies/commercial-medical-drug-policies.html",
+  "explore": true
+ },
+ {
+  "label": "UHC commercial reimbursement",
+  "url": "https://www.uhcprovider.com/en/policies-protocols/commercial-policies/commercial-reimbursement-policies.html"
+ },
+ {
+  "label": "UHC Medicare Advantage policies",
+  "url": "https://www.uhcprovider.com/en/policies-protocols/medicare-advantage-policies.html",
+  "explore": true
+ },
+ {
+  "label": "UHC site of service PDF",
+  "url": "https://www.uhcprovider.com/content/dam/provider/docs/public/policies/comm-medical-drug/outpatient-surg-procedures-site-service.pdf"
+ },
+ {
+  "label": "UHC Community Plan MO policies",
+  "url": "https://www.uhcprovider.com/en/health-plans-by-state/missouri-health-plans/mo-comm-plan-home/mo-cp-policies.html",
+  "explore": true
+ },
+ {
+  "label": "UHC Community Plan MO reimbursement",
+  "url": "https://www.uhcprovider.com/en/health-plans-by-state/missouri-health-plans/mo-comm-plan-home/mo-cp-policies/reimbursement-community-state-policies-missouri.html"
+ },
+ {
+  "label": "UHC Community Plan MO home",
+  "url": "https://www.uhcprovider.com/en/health-plans-by-state/missouri-health-plans/mo-comm-plan-home.html",
+  "explore": true
+ },
+ {
+  "label": "Aetna CPB landing",
+  "url": "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins.html"
+ },
+ {
+  "label": "Aetna CPB alphabetical",
+  "url": "https://www.aetna.com/cpb/medical/data/cpb_alpha.html"
+ },
+ {
+  "label": "Aetna CPB 0070 diabetes/CGM",
+  "url": "https://www.aetna.com/cpb/medical/data/1_99/0070.html"
+ },
+ {
+  "label": "Aetna newsletters archive",
+  "url": "https://www.aetna.com/health-care-professionals/newsletters-news/provider-newsletters-archive.html",
+  "explore": true
+ },
+ {
+  "label": "Anthem MO provider news",
+  "url": "https://providernews.anthem.com/missouri",
+  "explore": true
+ },
+ {
+  "label": "Anthem clinical guidelines",
+  "url": "https://www.anthem.com/provider/policies/clinical-guidelines/",
+  "explore": true
+ },
+ {
+  "label": "CMS NCD what's new",
+  "url": "https://www.cms.gov/medicare-coverage-database/reports/national-coverage-whats-new-report.aspx?docType=all&timeframe=30"
+ },
+ {
+  "label": "CMS LCD what's new",
+  "url": "https://www.cms.gov/medicare-coverage-database/reports/local-coverage-whats-new-report.aspx?contractorName=all"
+ },
+ {
+  "label": "CMS NCD 20.4 ICDs",
+  "url": "https://www.cms.gov/medicare-coverage-database/view/ncd.aspx?NCDId=110"
+ },
+ {
+  "label": "CMS LCD L35125 wound care (WPS)",
+  "url": "https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?LCDId=35125"
+ },
+ {
+  "label": "CMS transmittals",
+  "url": "https://www.cms.gov/medicare/regulations-guidance/transmittals"
+ },
+ {
+  "label": "CMS MLN newsletter",
+  "url": "https://www.cms.gov/training-education/medicare-learning-network/newsletter"
+ },
+ {
+  "label": "CMS MCD landing",
+  "url": "https://www.cms.gov/medicare-coverage-database"
+ },
+ {
+  "label": "WPS LCD updates Dec 2025",
+  "url": "https://www.wpsgha.com/news-updates/view/december-2025-local-coverage-determination-lcd-and-bill",
+  "explore": true
+ },
+ {
+  "label": "WPS LCD guide",
+  "url": "https://www.wpsgha.com/guides-resources/view/local-coverage-determinations-lcds-and-billing-and-codi",
+  "explore": true
+ },
+ {
+  "label": "WPS news listing",
+  "url": "https://www.wpsgha.com/news-updates",
+  "explore": true
+ },
+ {
+  "label": "MO HealthNet news",
+  "url": "https://dss.mo.gov/mhd/news",
+  "explore": true
+ },
+ {
+  "label": "MO HealthNet providers",
+  "url": "https://dss.mo.gov/mhd/providers",
+  "explore": true
+ },
+ {
+  "label": "MO HealthNet bulletin all providers",
+  "url": "https://dss.mo.gov/mhd/bulletin-hot-tip/all-mo-healthnet-providers",
+  "explore": true
+ },
+ {
+  "label": "Healthy Blue MO medical policies",
+  "url": "https://provider.healthybluemo.com/missouri-provider/medical-policies-and-clinical-guidelines",
+  "explore": true
+ },
+ {
+  "label": "Healthy Blue MO provider news",
+  "url": "https://providernews.healthybluemo.com/",
+  "explore": true
+ },
+ {
+  "label": "Healthy Blue MO manuals",
+  "url": "https://provider.healthybluemo.com/missouri-provider/resources/manuals-and-guides",
+  "explore": true
+ },
+ {
+  "label": "Home State Health clinical & payment policies",
+  "url": "https://www.homestatehealth.com/providers/tools-resources/clinical-payment-policies.html",
+  "explore": true
+ },
+ {
+  "label": "Home State Health provider news",
+  "url": "https://www.homestatehealth.com/providers/provider-news.html",
+  "explore": true
+ },
+ {
+  "label": "Home State Health newsroom",
+  "url": "https://www.homestatehealth.com/newsroom.html",
+  "explore": true
+ },
+ {
+  "label": "Wellcare MO Medicare payment policy",
+  "url": "https://www.wellcare.com/en/missouri/providers/medicare/claims/payment-policy",
+  "explore": true
+ },
+ {
+  "label": "Wellcare MO Medicare providers",
+  "url": "https://www.wellcare.com/en/missouri/providers/medicare",
+  "explore": true
+ }
+]

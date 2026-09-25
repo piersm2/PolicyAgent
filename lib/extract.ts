@@ -8,6 +8,7 @@ import type { PageLink } from "./types";
 export interface Snapshot {
   kind: "html" | "file"; // "file" = PDF or other non-HTML document
   hash: string;
+  finalUrl: string; // after redirects
   lines: string[];
   links: PageLink[];
   // Set when the page may not have loaded fully (e.g. built by JavaScript).
@@ -46,7 +47,7 @@ export async function fetchSnapshot(url: string): Promise<Snapshot> {
   const contentType = res.headers.get("content-type") ?? "";
   if (!/html|xml/i.test(contentType)) {
     // PDFs and other documents: detect changes by content hash only.
-    return { kind: "file", hash: sha256(body), lines: [], links: [], note: null };
+    return { kind: "file", hash: sha256(body), finalUrl: res.url || url, lines: [], links: [], note: null };
   }
   return parseHtml(body.toString("utf8"), res.url || url);
 }
@@ -92,6 +93,7 @@ export function parseHtml(html: string, baseUrl: string): Snapshot {
   return {
     kind: "html",
     hash: sha256(JSON.stringify([sortedLines, sortedLinks.map((l) => l.url)])),
+    finalUrl: baseUrl,
     lines: sortedLines,
     links: sortedLinks,
     note,
