@@ -1,6 +1,9 @@
 {
   "name": "PolicyAgent",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
   "postCreateCommand": "npm install",
   "postAttachCommand": "npm run dev",
   "forwardPorts": [3000],

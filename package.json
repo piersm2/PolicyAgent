@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check-due": "tsx scripts/check-due.ts",
+    "check-links": "tsx scripts/check-links.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { fetchSnapshot, type Snapshot } from "./extract";
+import { fetchSnapshot, normalizeLinkUrl, type Snapshot } from "./extract";
 import { ValidationError } from "./validate";
 import type { PageChange, PageLink, WatchPage } from "./types";
 
@@ -7,13 +7,30 @@ import type { PageChange, PageLink, WatchPage } from "./types";
 // Watch pages
 // ---------------------------------------------------------------------------
 const PAGE_SELECT = `
-  SELECT w.id, w.payerId, pay.name AS payerName, w.url, w.label, w.lastCheckedAt,
+  SELECT w.id, w.payerId, pay.name AS payerName, w.policyId, pol.title AS policyTitle, w.url, w.label, w.lastCheckedAt,
          w.lastSuccessAt, w.lastError, w.lastNote, w.createdAt,
          (SELECT COUNT(*) FROM page_changes c WHERE c.pageId = w.id AND c.reviewedAt IS NULL)
            AS unreviewedChanges
   FROM watch_pages w
   JOIN payers pay ON pay.id = w.payerId
+  LEFT JOIN policies pol ON pol.id = w.policyId
 `;
+
+/** The watch page following one policy's document, if any. */
+export function getPolicyWatch(policyId: number): WatchPage | undefined {
+  return getDb().prepare(PAGE_SELECT + " WHERE w.policyId = ?").get(policyId) as WatchPage | undefined;
+}
+
+/** Policy ids with a detected document change that hasn't been reviewed. */
+export function policiesWithUnreviewedChanges(): Set<number> {
+  const rows = getDb()
+    .prepare(
+      `SELECT DISTINCT w.policyId FROM page_changes c JOIN watch_pages w ON w.id = c.pageId
+       WHERE c.reviewedAt IS NULL AND w.policyId IS NOT NULL`
+    )
+    .all() as { policyId: number }[];
+  return new Set(rows.map((r) => r.policyId));
+}
 
 export function listWatchPages(): WatchPage[] {
   return getDb()
@@ -41,18 +58,25 @@ export function deleteWatchPage(id: number): boolean {
 // ---------------------------------------------------------------------------
 const MAX_ITEMS_PER_LIST = 100;
 
-export function listPageChanges(opts: { unreviewedOnly?: boolean; limit?: number } = {}): PageChange[] {
+export function listPageChanges(
+  opts: { unreviewedOnly?: boolean; policyId?: number; limit?: number } = {}
+): PageChange[] {
+  const where: string[] = [];
+  if (opts.unreviewedOnly) where.push("c.reviewedAt IS NULL");
+  if (opts.policyId !== undefined) where.push("w.policyId = @policyId");
   const rows = getDb()
     .prepare(
-      `SELECT c.*, w.label AS pageLabel, w.url AS pageUrl, pay.name AS payerName
+      `SELECT c.*, w.label AS pageLabel, w.url AS pageUrl, w.policyId, pol.title AS policyTitle,
+              pay.name AS payerName
        FROM page_changes c
        JOIN watch_pages w ON w.id = c.pageId
        JOIN payers pay ON pay.id = w.payerId
-       ${opts.unreviewedOnly ? "WHERE c.reviewedAt IS NULL" : ""}
+       LEFT JOIN policies pol ON pol.id = w.policyId
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY c.detectedAt DESC, c.id DESC
-       LIMIT ?`
+       LIMIT @limit`
     )
-    .all(opts.limit ?? 50) as any[];
+    .all({ policyId: opts.policyId, limit: opts.limit ?? 50 }) as any[];
   return rows.map((r) => ({
     ...r,
     newLinks: JSON.parse(r.newLinks),
@@ -104,6 +128,8 @@ async function runChecks(which: "all" | "due" | number[]): Promise<CheckResult[]
   if (which === "all") {
     ids = (db.prepare("SELECT id FROM watch_pages ORDER BY id").all() as { id: number }[]).map((r) => r.id);
   } else if (which === "due") {
+    // 30 minutes' grace so a daily scheduler that fires a little early still
+    // catches pages checked at about the same time yesterday.
     ids = (
       db
         .prepare(
@@ -111,7 +137,7 @@ async function runChecks(which: "all" | "due" | number[]): Promise<CheckResult[]
            WHERE lastCheckedAt IS NULL OR lastCheckedAt <= datetime('now', ?)
            ORDER BY id`
         )
-        .all(`-${checkEveryHours()} hours`) as { id: number }[]
+        .all(`-${Math.max(checkEveryHours() * 60 - 30, 30)} minutes`) as { id: number }[]
     ).map((r) => r.id);
   } else {
     ids = which;
@@ -168,13 +194,14 @@ async function checkPage(pageId: number): Promise<CheckResult> {
 
 function diffSnapshots(prev: Snapshot, next: Snapshot) {
   const fileChanged = prev.kind === "file" || next.kind === "file";
-  const prevUrls = new Set(prev.links.map((l) => l.url));
-  const nextUrls = new Set(next.links.map((l) => l.url));
+  // Normalize both sides: snapshots taken before normalization existed still hold raw URLs.
+  const prevUrls = new Set(prev.links.map((l) => normalizeLinkUrl(l.url)));
+  const nextUrls = new Set(next.links.map((l) => normalizeLinkUrl(l.url)));
   const prevLines = new Set(prev.lines);
   const nextLines = new Set(next.lines);
 
-  const newLinks: PageLink[] = next.links.filter((l) => !prevUrls.has(l.url)).slice(0, MAX_ITEMS_PER_LIST);
-  const removedLinks: PageLink[] = prev.links.filter((l) => !nextUrls.has(l.url)).slice(0, MAX_ITEMS_PER_LIST);
+  const newLinks: PageLink[] = next.links.filter((l) => !prevUrls.has(normalizeLinkUrl(l.url))).slice(0, MAX_ITEMS_PER_LIST);
+  const removedLinks: PageLink[] = prev.links.filter((l) => !nextUrls.has(normalizeLinkUrl(l.url))).slice(0, MAX_ITEMS_PER_LIST);
   // A list item that is just a new link's title is already reported as a link.
   const newLinkText = new Set(newLinks.map((l) => l.text));
   const removedLinkText = new Set(removedLinks.map((l) => l.text));

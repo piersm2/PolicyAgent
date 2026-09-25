@@ -64,8 +64,13 @@ export interface Policy {
   impact: Impact;
   effectiveDate: string | null; // ISO date (YYYY-MM-DD)
   nextReviewDate: string | null;
-  sourceUrl: string | null;
+  sourceUrl: string | null; // the policy's own document
   summary: string | null; // shown as "Notes"
+  reviewEveryMonths: number;
+  lastReviewedAt: string | null; // date
+  owner: string | null;
+  nextAction: string | null;
+  actionDue: string | null; // date
   createdAt: string;
   updatedAt: string;
 }
@@ -74,7 +79,11 @@ export interface PolicyWithPayer extends Policy {
   status: PolicyStatus;
   payerName: string;
   payerType: PayerType;
+  /** Id of the watch page following this policy's document, if any. */
+  documentWatchId: number | null;
 }
+
+export const REVIEW_INTERVALS = [1, 3, 6, 12, 24] as const;
 
 export interface PolicyChange {
   id: number;
@@ -99,6 +108,8 @@ export interface WatchPage {
   id: number;
   payerId: number;
   payerName: string;
+  policyId: number | null;
+  policyTitle: string | null;
   url: string;
   label: string;
   lastCheckedAt: string | null;
@@ -113,6 +124,8 @@ export interface WatchPage {
 export interface PageChange {
   id: number;
   pageId: number;
+  policyId: number | null;
+  policyTitle: string | null;
   payerName: string;
   pageLabel: string;
   pageUrl: string;

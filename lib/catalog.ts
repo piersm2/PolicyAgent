@@ -159,7 +159,10 @@ export const CATALOG: CatalogPayer[] = [
     region: "Missouri",
     website: "https://www.anthem.com/provider/policies/clinical-guidelines/?cnslocale=en_US_mo",
     pages: [
-      { label: "Medical policy & clinical guideline updates", url: "https://www.anthem.com/provider/policies/clinical-guidelines/updates" },
+      {
+        label: "Medical policy & clinical guideline updates (Missouri)",
+        url: "https://www.anthem.com/provider/policies/clinical-guidelines/updates/?cnslocale=en_US_mo",
+      },
       { label: "Missouri reimbursement policies", url: "https://www.anthem.com/mo/provider/individual-commercial/reimbursement" },
     ],
     note: "Anthem Provider News for Missouri loads with JavaScript and can't be watched directly.",
@@ -196,6 +199,13 @@ export const CATALOG: CatalogPayer[] = [
     ],
   },
 ];
+
+/** Look up a catalog page URL by payer key and page position (for upgrade fixes). */
+export function catalogPage(key: string, index: number): CatalogPage {
+  const page = CATALOG.find((c) => c.key === key)?.pages[index];
+  if (!page) throw new Error(`No catalog page ${key}[${index}]`);
+  return page;
+}
 
 /** Sample policies with their own documents, for a new database. `payer` is a catalog key. */
 export const SAMPLE_POLICIES = [

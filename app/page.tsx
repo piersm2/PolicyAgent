@@ -8,7 +8,7 @@ import { WebsiteChanges } from "@/components/WebsiteChanges";
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  const { counts, needsAttention, recentChanges } = getBoard();
+  const { counts, needsAttention, recentChanges, actionItems } = getBoard();
   const websiteChanges = listPageChanges({ unreviewedOnly: true, limit: 20 });
 
   return (
@@ -18,7 +18,8 @@ export default function HomePage() {
           <h1 className="text-2xl font-bold text-slate-900">Home</h1>
           <p className="text-sm text-slate-500">
             {counts.policies} policies · {counts.upcoming} upcoming · {counts.highImpact} high impact ·{" "}
-            {counts.payers} payers
+            {counts.payers} payers · {counts.openActions} open action{counts.openActions === 1 ? "" : "s"}
+            {counts.overdueActions > 0 && <span className="font-semibold text-red-600"> ({counts.overdueActions} overdue)</span>}
           </p>
         </div>
         <div className="flex gap-2">
@@ -33,6 +34,33 @@ export default function HomePage() {
 
       {websiteChanges.length > 0 && <WebsiteChanges changes={websiteChanges} />}
 
+      {actionItems.length > 0 && (
+        <section className="card p-5">
+          <h2 className="font-semibold text-slate-900">Action items</h2>
+          <p className="mb-3 text-xs text-slate-500">Next actions on policies, soonest due first.</p>
+          <ul className="divide-y divide-slate-100">
+            {actionItems.map((a) => (
+              <li key={a.policyId}>
+                <Link
+                  href={`/policies/${a.policyId}`}
+                  className="-mx-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 rounded-lg px-2 py-2 hover:bg-slate-50"
+                >
+                  <span className="min-w-0">
+                    <span className="font-medium text-slate-800">{a.nextAction}</span>
+                    <span className="block text-xs text-slate-500">
+                      {a.payerName} · {a.title} · Owner: {a.owner || "unassigned"}
+                    </span>
+                  </span>
+                  <span className={`text-sm ${a.overdue ? "font-semibold text-red-600" : "text-slate-600"}`}>
+                    {a.actionDue ? `${a.overdue ? "Overdue · " : "Due "}${formatDate(a.actionDue)}` : "No due date"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="card p-5 lg:col-span-3">
           <h2 className="font-semibold text-slate-900">Needs attention</h2>
@@ -42,15 +70,17 @@ export default function HomePage() {
           ) : (
             <ol className="space-y-4">
               {needsAttention.map((p, i) => (
-                <li key={p.id} className="flex gap-3">
+                <li key={p.id}>
+                  <Link
+                    href={`/policies/${p.id}`}
+                    className="group -mx-2 flex gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50"
+                  >
                   <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
                     {i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/policies/${p.id}`} className="font-medium text-slate-800 hover:text-brand-700">
-                        {p.title}
-                      </Link>
+                      <span className="font-medium text-slate-800 group-hover:text-brand-700">{p.title}</span>
                       <StatusBadge status={p.status} />
                       <ImpactBadge impact={p.impact} />
                     </div>
@@ -68,6 +98,7 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
+                  </Link>
                 </li>
               ))}
             </ol>

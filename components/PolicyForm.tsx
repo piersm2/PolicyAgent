@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Modal } from "./Modal";
 import { apiSend } from "@/lib/client";
-import { IMPACTS, POLICY_CATEGORIES, type Payer, type PolicyWithPayer } from "@/lib/types";
+import { IMPACTS, POLICY_CATEGORIES, REVIEW_INTERVALS, type Payer, type PolicyWithPayer } from "@/lib/types";
 
 type Props = {
   payers: Payer[];
@@ -22,12 +22,17 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
     effectiveDate: initial?.effectiveDate ?? "",
     nextReviewDate: initial?.nextReviewDate ?? "",
     sourceUrl: initial?.sourceUrl ?? "",
+    watchDocument: initial ? initial.documentWatchId !== null : true,
     summary: initial?.summary ?? "",
+    reviewEveryMonths: initial?.reviewEveryMonths ?? 12,
+    owner: initial?.owner ?? "",
+    nextAction: initial?.nextAction ?? "",
+    actionDue: initial?.actionDue ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof typeof form, v: string | number | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,9 +107,60 @@ export function PolicyForm({ payers, initial, onClose, onSaved }: Props) {
         </p>
 
         <div>
-          <label className="label">Link to policy</label>
-          <input className="input" value={form.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://…" />
+          <label className="label">Policy document link</label>
+          <input
+            className="input"
+            value={form.sourceUrl}
+            onChange={(e) => set("sourceUrl", e.target.value)}
+            placeholder="https://… (the policy itself, e.g. its PDF — not the payer's home page)"
+          />
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={form.watchDocument}
+              onChange={(e) => set("watchDocument", e.target.checked)}
+            />
+            Watch this document for changes
+          </label>
         </div>
+
+        <div>
+          <label className="label">Review every</label>
+          <select
+            className="input"
+            value={form.reviewEveryMonths}
+            onChange={(e) => set("reviewEveryMonths", Number(e.target.value))}
+          >
+            {REVIEW_INTERVALS.map((m) => (
+              <option key={m} value={m}>
+                {m} month{m === 1 ? "" : "s"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <fieldset className="rounded-lg border border-slate-200 p-3">
+          <legend className="label px-1">Follow-up</legend>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Owner</label>
+              <input className="input" value={form.owner} onChange={(e) => set("owner", e.target.value)} placeholder="Who's responsible" />
+            </div>
+            <div>
+              <label className="label">Due date</label>
+              <input type="date" className="input" value={form.actionDue} onChange={(e) => set("actionDue", e.target.value)} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="label">Next action</label>
+            <input
+              className="input"
+              value={form.nextAction}
+              onChange={(e) => set("nextAction", e.target.value)}
+              placeholder="e.g. Update the charge master for the new codes"
+            />
+          </div>
+        </fieldset>
 
         <div>
           <label className="label">Notes</label>

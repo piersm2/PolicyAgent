@@ -8,7 +8,15 @@ import type { PageChange, PageLink } from "@/lib/types";
 
 const SHOW = 10;
 
-export function WebsiteChanges({ changes }: { changes: PageChange[] }) {
+export function WebsiteChanges({
+  changes,
+  title = "Website changes to review",
+  subtitle = "Found on watched payer pages since your last review.",
+}: {
+  changes: PageChange[];
+  title?: string;
+  subtitle?: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +36,8 @@ export function WebsiteChanges({ changes }: { changes: PageChange[] }) {
 
   return (
     <section className="card p-5">
-      <h2 className="font-semibold text-slate-900">Website changes to review</h2>
-      <p className="mb-4 text-xs text-slate-500">Found on watched payer pages since your last review.</p>
+      <h2 className="font-semibold text-slate-900">{title}</h2>
+      <p className="mb-4 text-xs text-slate-500">{subtitle}</p>
       {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <ul className="space-y-3">
         {changes.map((c) => (
@@ -37,7 +45,15 @@ export function WebsiteChanges({ changes }: { changes: PageChange[] }) {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-medium text-slate-800">
-                  {c.payerName} — {c.pageLabel}
+                  {c.policyId ? (
+                    <a href={`/policies/${c.policyId}`} className="hover:text-brand-700">
+                      {c.payerName} — {c.policyTitle} (policy document)
+                    </a>
+                  ) : (
+                    <>
+                      {c.payerName} — {c.pageLabel}
+                    </>
+                  )}
                 </div>
                 <div className="text-xs text-slate-500" suppressHydrationWarning>
                   Detected {formatDateTime(c.detectedAt)} · {summarize(c)}

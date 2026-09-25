@@ -1,7 +1,8 @@
 // Check payer policy URLs the way the watcher sees them.
-// Usage: npx tsx scripts/check-links.ts [file.json]
+// Usage: npm run check-links -- [file.json] [--strict]
 // The file holds [{ "url": "...", "label": "...", "explore": true }]; with no file,
-// every URL in the payer catalog (lib/catalog.ts) is checked.
+// every URL in the payer catalog (lib/catalog.ts) is checked. --strict exits
+// non-zero if any URL fails to load.
 import { readFileSync } from "node:fs";
 import { fetchSnapshot } from "../lib/extract";
 
@@ -10,7 +11,7 @@ type Entry = { url: string; label?: string; explore?: boolean; match?: string };
 const POLICY_WORDS = /polic|bulletin|update|guideline|coverage|reimburs|payment|manual|news|\.pdf/i;
 
 async function loadEntries(): Promise<Entry[]> {
-  const file = process.argv[2];
+  const file = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (file) return JSON.parse(readFileSync(file, "utf8"));
   const { catalogUrls } = await import("../lib/catalog");
   return catalogUrls();

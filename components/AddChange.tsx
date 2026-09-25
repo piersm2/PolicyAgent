@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiSend } from "@/lib/client";
 import { Modal } from "./Modal";
-import { todayLocal } from "@/lib/format";
+import { today } from "@/lib/format";
 
 export function AddChange({ policyId }: { policyId: number }) {
   const router = useRouter();
@@ -12,7 +12,7 @@ export function AddChange({ policyId }: { policyId: number }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    changeDate: todayLocal(),
+    changeDate: today(),
     summary: "",
   });
 
@@ -25,7 +25,7 @@ export function AddChange({ policyId }: { policyId: number }) {
     try {
       await apiSend(`/api/policies/${policyId}/changes`, "POST", form);
       setOpen(false);
-      setForm({ changeDate: todayLocal(), summary: "" });
+      setForm({ changeDate: today(), summary: "" });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");

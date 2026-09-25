@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { ValidationError } from "./validate";
+import { addMonths, today } from "./format";
 import type {
   Payer,
   Policy,
@@ -21,16 +22,17 @@ export function getPayer(id: number): Payer | undefined {
   return getDb().prepare("SELECT * FROM payers WHERE id = ?").get(id) as Payer | undefined;
 }
 
-export function listPayersWithCounts(): (Payer & { policyCount: number })[] {
+export function listPayersWithCounts(): (Payer & { policyCount: number; pageCount: number })[] {
   return getDb()
     .prepare(
-      `SELECT pay.*, COUNT(p.id) AS policyCount
+      `SELECT pay.*, COUNT(p.id) AS policyCount,
+         (SELECT COUNT(*) FROM watch_pages w WHERE w.payerId = pay.id AND w.policyId IS NULL) AS pageCount
        FROM payers pay
        LEFT JOIN policies p ON p.payerId = pay.id
        GROUP BY pay.id
        ORDER BY pay.name COLLATE NOCASE`
     )
-    .all() as (Payer & { policyCount: number })[];
+    .all() as (Payer & { policyCount: number; pageCount: number })[];
 }
 
 export function createPayer(input: PayerInput): Payer {
@@ -58,14 +60,17 @@ export function deletePayer(id: number): boolean {
 // ---------------------------------------------------------------------------
 
 // Status isn't stored: a future effective date means Upcoming, otherwise Active.
-const STATUS_SQL = `CASE WHEN p.effectiveDate IS NOT NULL AND date(p.effectiveDate) > date('now')
+// @today is today's date in the app's time zone (not SQLite's UTC date('now')).
+const STATUS_SQL = `CASE WHEN p.effectiveDate IS NOT NULL AND date(p.effectiveDate) > @today
   THEN 'Upcoming' ELSE 'Active' END`;
 
 const POLICY_SELECT = `
   SELECT p.id, p.payerId, p.title, p.category, p.impact, p.effectiveDate,
-         p.nextReviewDate, p.sourceUrl, p.summary, p.createdAt, p.updatedAt,
+         p.nextReviewDate, p.sourceUrl, p.summary, p.reviewEveryMonths, p.lastReviewedAt,
+         p.owner, p.nextAction, p.actionDue, p.createdAt, p.updatedAt,
          ${STATUS_SQL} AS status,
-         pay.name AS payerName, pay.type AS payerType
+         pay.name AS payerName, pay.type AS payerType,
+         (SELECT w.id FROM watch_pages w WHERE w.policyId = p.id LIMIT 1) AS documentWatchId
   FROM policies p
   JOIN payers pay ON pay.id = p.payerId
 `;
@@ -78,7 +83,7 @@ export interface PolicyFilter {
 
 export function listPolicies(filter: PolicyFilter = {}): PolicyWithPayer[] {
   const where: string[] = [];
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { today: today() };
 
   if (filter.search) {
     where.push("(p.title LIKE @search OR p.summary LIKE @search)");
@@ -105,38 +110,116 @@ export function listPolicies(filter: PolicyFilter = {}): PolicyWithPayer[] {
 }
 
 export function getPolicy(id: number): PolicyWithPayer | undefined {
-  return getDb().prepare(POLICY_SELECT + " WHERE p.id = ?").get(id) as PolicyWithPayer | undefined;
+  return getDb().prepare(POLICY_SELECT + " WHERE p.id = @id").get({ id, today: today() }) as
+    | PolicyWithPayer
+    | undefined;
 }
 
-type PolicyInput = Omit<Policy, "id" | "createdAt" | "updatedAt">;
+export type PolicyInput = Omit<Policy, "id" | "createdAt" | "updatedAt" | "lastReviewedAt"> & {
+  /** Watch the policy's own document (sourceUrl) for changes. */
+  watchDocument: boolean;
+};
+
+const POLICY_FIELDS = `payerId, title, category, impact, effectiveDate, nextReviewDate, sourceUrl, summary,
+  reviewEveryMonths, owner, nextAction, actionDue`;
 
 export function createPolicy(input: PolicyInput): PolicyWithPayer {
   assertPayerExists(input.payerId);
-  const info = getDb()
-    .prepare(
-      `INSERT INTO policies
-        (payerId, title, category, impact, effectiveDate, nextReviewDate, sourceUrl, summary)
-       VALUES
-        (@payerId, @title, @category, @impact, @effectiveDate, @nextReviewDate, @sourceUrl, @summary)`
-    )
-    .run(normalizePolicy(input));
-  return getPolicy(Number(info.lastInsertRowid))!;
+  const db = getDb();
+  const id = db.transaction(() => {
+    const info = db
+      .prepare(
+        `INSERT INTO policies (${POLICY_FIELDS})
+         VALUES (@payerId, @title, @category, @impact, @effectiveDate, @nextReviewDate, @sourceUrl, @summary,
+           @reviewEveryMonths, @owner, @nextAction, @actionDue)`
+      )
+      .run(normalizePolicy(input));
+    const newId = Number(info.lastInsertRowid);
+    syncDocumentWatch(newId, input);
+    return newId;
+  })();
+  return getPolicy(id)!;
 }
 
 // PUT semantics: the input replaces every editable field.
 export function updatePolicy(id: number, input: PolicyInput): PolicyWithPayer | undefined {
   if (!getPolicy(id)) return undefined;
   assertPayerExists(input.payerId);
-  getDb()
-    .prepare(
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(
       `UPDATE policies SET
         payerId=@payerId, title=@title, category=@category, impact=@impact,
-        effectiveDate=@effectiveDate, nextReviewDate=@nextReviewDate,
-        sourceUrl=@sourceUrl, summary=@summary, updatedAt=datetime('now')
+        effectiveDate=@effectiveDate, nextReviewDate=@nextReviewDate, sourceUrl=@sourceUrl,
+        summary=@summary, reviewEveryMonths=@reviewEveryMonths, owner=@owner,
+        nextAction=@nextAction, actionDue=@actionDue, updatedAt=datetime('now')
        WHERE id=@id`
-    )
-    .run({ id, ...normalizePolicy(input) });
+    ).run({ id, ...normalizePolicy(input) });
+    syncDocumentWatch(id, input);
+  })();
   return getPolicy(id);
+}
+
+/**
+ * Keep the policy's document watch in line with the form: one watch page per
+ * policy, following sourceUrl. A changed URL starts a fresh baseline.
+ */
+function syncDocumentWatch(policyId: number, input: PolicyInput) {
+  const db = getDb();
+  const existing = db.prepare("SELECT id, url FROM watch_pages WHERE policyId = ?").get(policyId) as
+    | { id: number; url: string }
+    | undefined;
+  const wanted = input.watchDocument && input.sourceUrl ? input.sourceUrl : null;
+  const label = `Policy document: ${input.title}`;
+
+  if (!wanted) {
+    if (existing) db.prepare("DELETE FROM watch_pages WHERE id = ?").run(existing.id);
+  } else if (!existing) {
+    db.prepare("INSERT INTO watch_pages (payerId, policyId, url, label) VALUES (?, ?, ?, ?)").run(
+      input.payerId,
+      policyId,
+      wanted,
+      label
+    );
+  } else if (existing.url !== wanted) {
+    db.prepare(
+      `UPDATE watch_pages SET url = ?, label = ?, payerId = ?, snapshot = NULL, lastError = NULL,
+         lastNote = NULL, lastCheckedAt = NULL, lastSuccessAt = NULL WHERE id = ?`
+    ).run(wanted, label, input.payerId, existing.id);
+  } else {
+    db.prepare("UPDATE watch_pages SET label = ?, payerId = ? WHERE id = ?").run(label, input.payerId, existing.id);
+  }
+}
+
+/** Record a review today and move the next review date forward by the policy's interval. */
+export function markPolicyReviewed(id: number): PolicyWithPayer | undefined {
+  const policy = getPolicy(id);
+  if (!policy) return undefined;
+  const reviewedOn = today();
+  getDb()
+    .prepare("UPDATE policies SET lastReviewedAt = ?, nextReviewDate = ?, updatedAt = datetime('now') WHERE id = ?")
+    .run(reviewedOn, addMonths(reviewedOn, policy.reviewEveryMonths || 12), id);
+  return getPolicy(id);
+}
+
+/** Clear the policy's next action (the owner stays). */
+export function completePolicyAction(id: number): PolicyWithPayer | undefined {
+  if (!getPolicy(id)) return undefined;
+  getDb()
+    .prepare("UPDATE policies SET nextAction = NULL, actionDue = NULL, updatedAt = datetime('now') WHERE id = ?")
+    .run(id);
+  return getPolicy(id);
+}
+
+/** Policies with an open next action, soonest due first (undated last). */
+export function listActionItems(): PolicyWithPayer[] {
+  return getDb()
+    .prepare(
+      POLICY_SELECT +
+        ` WHERE p.nextAction IS NOT NULL
+          ORDER BY p.actionDue IS NULL, p.actionDue, p.title`
+    )
+    .all({ today: today() }) as PolicyWithPayer[];
 }
 
 export function deletePolicy(id: number): boolean {
@@ -157,6 +240,10 @@ function normalizePolicy(input: PolicyInput) {
     nextReviewDate: input.nextReviewDate || null,
     sourceUrl: input.sourceUrl ?? null,
     summary: input.summary ?? null,
+    reviewEveryMonths: input.reviewEveryMonths,
+    owner: input.owner ?? null,
+    nextAction: input.nextAction ?? null,
+    actionDue: input.nextAction ? input.actionDue || null : null,
   };
 }
 
@@ -203,11 +290,11 @@ export function latestPastChangeByPolicy(): Map<number, PolicyChange> {
       `SELECT c.* FROM policy_changes c
        WHERE c.id = (
          SELECT id FROM policy_changes
-         WHERE policyId = c.policyId AND date(changeDate) <= date('now')
+         WHERE policyId = c.policyId AND date(changeDate) <= ?
          ORDER BY changeDate DESC, id DESC LIMIT 1
        )`
     )
-    .all() as PolicyChange[];
+    .all(today()) as PolicyChange[];
   return new Map(rows.map((c) => [c.policyId, c]));
 }
 

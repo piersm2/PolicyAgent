@@ -1,14 +1,17 @@
 name: Verify payer links
 
-# Checks payer policy URLs from GitHub's network (the same view the watcher has).
+# Checks every catalog and sample-policy URL from GitHub's network (the same
+# view the watcher has), when the catalog changes and weekly to catch pages a
+# payer has moved. A failed run means a URL in lib/catalog.ts needs updating.
 on:
   push:
     paths:
       - "scripts/check-links.ts"
-      - "scripts/link-candidates.json"
       - "lib/catalog.ts"
       - "lib/extract.ts"
       - ".github/workflows/verify-links.yml"
+  schedule:
+    - cron: "23 13 * * 1" # Mondays
   workflow_dispatch:
 
 jobs:
@@ -22,9 +25,5 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Check candidate links
-        if: hashFiles('scripts/link-candidates.json') != ''
-        run: npx tsx scripts/check-links.ts scripts/link-candidates.json
       - name: Check catalog links
-        if: hashFiles('lib/catalog.ts') != ''
-        run: npx tsx scripts/check-links.ts
+        run: npx tsx scripts/check-links.ts --strict

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPolicy, listChangesForPolicy } from "@/lib/repo";
+import { getPolicy, listChangesForPolicy, listPayers } from "@/lib/repo";
+import { getPolicyWatch, listPageChanges } from "@/lib/watch";
 import { CategoryBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
 import { AddChange } from "@/components/AddChange";
-import { formatDate, relativeDays, safeHref } from "@/lib/format";
+import { ActionCard, PolicyHeaderActions } from "@/components/PolicyControls";
+import { WebsiteChanges } from "@/components/WebsiteChanges";
+import { daysFromToday, formatDate, formatDateTime, relativeDays } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +24,10 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
   const policy = getPolicy(id);
   if (!policy) notFound();
   const changes = listChangesForPolicy(id);
-  const sourceHref = safeHref(policy.sourceUrl);
+  const watch = getPolicyWatch(id);
+  const documentChanges = listPageChanges({ policyId: id, unreviewedOnly: true });
+  const reviewDue = daysFromToday(policy.nextReviewDate);
+  const reviewOverdue = reviewDue !== null && reviewDue < 0;
 
   return (
     <div className="space-y-6">
@@ -46,35 +52,73 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
               </Link>
             </div>
           </div>
-          <div className="flex gap-2">
-            {sourceHref && (
-              <a href={sourceHref} target="_blank" rel="noreferrer" className="btn-primary text-sm">
-                Open source ↗
-              </a>
-            )}
-          </div>
+          <PolicyHeaderActions policy={policy} payers={listPayers()} />
         </div>
 
         {policy.summary && (
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-700">{policy.summary}</p>
         )}
 
-        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
+        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-4">
           <Field label="Effective date">
             {formatDate(policy.effectiveDate)}
             {policy.effectiveDate && (
               <span className="ml-1 text-xs text-slate-400">({relativeDays(policy.effectiveDate)})</span>
             )}
           </Field>
-          <Field label="Review date">
+          <Field label="Next review">
             {formatDate(policy.nextReviewDate)}
             {policy.nextReviewDate && (
-              <span className="ml-1 text-xs text-slate-400">({relativeDays(policy.nextReviewDate)})</span>
+              <span className={`ml-1 text-xs ${reviewOverdue ? "font-semibold text-red-600" : "text-slate-400"}`}>
+                ({reviewOverdue ? `overdue ${Math.abs(reviewDue!)}d` : relativeDays(policy.nextReviewDate)})
+              </span>
             )}
+            <div className="text-xs text-slate-400">
+              every {policy.reviewEveryMonths} month{policy.reviewEveryMonths === 1 ? "" : "s"}
+            </div>
           </Field>
-          <Field label="Last updated">{formatDate(policy.updatedAt)}</Field>
+          <Field label="Last reviewed">{formatDate(policy.lastReviewedAt)}</Field>
+          <Field label="Last updated">{formatDateTime(policy.updatedAt)}</Field>
         </div>
       </div>
+
+      <ActionCard policy={policy} payers={listPayers()} />
+
+      {/* The policy's own document */}
+      <div className="card p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Policy document</h2>
+        {!policy.sourceUrl ? (
+          <p className="mt-1 text-sm text-slate-400">No document link. Edit the policy to add one and watch it.</p>
+        ) : !watch ? (
+          <p className="mt-1 text-sm text-slate-500">
+            <span className="break-all">{policy.sourceUrl}</span>
+            <br />
+            Not watched. Edit the policy and tick “Watch this document for changes”.
+          </p>
+        ) : (
+          <div className="mt-1 text-sm">
+            <p className="break-all text-slate-500">{watch.url}</p>
+            {watch.lastError ? (
+              <p className="text-red-600">Last check failed: {watch.lastError}</p>
+            ) : watch.lastSuccessAt ? (
+              <p className="text-slate-500">
+                Watched · last checked {formatDateTime(watch.lastCheckedAt)}
+                {watch.lastNote && <span className="block text-amber-700">{watch.lastNote}</span>}
+              </p>
+            ) : (
+              <p className="text-slate-400">Watched · not checked yet (the first check records a starting point)</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {documentChanges.length > 0 && (
+        <WebsiteChanges
+          changes={documentChanges}
+          title="Document changes to review"
+          subtitle="Differences found in this policy's document since it was last reviewed."
+        />
+      )}
 
       {/* Change history */}
       <div className="card p-6">
