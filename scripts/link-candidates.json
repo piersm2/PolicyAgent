@@ -1,111 +1,13 @@
 [
  {
-  "label": "UHC MA medical policies",
-  "url": "https://www.uhcprovider.com/en/policies-protocols/medicare-advantage-policies/medicare-advantage-medical-policies.html",
-  "explore": true,
-  "match": "bulletin|update|observation|inpatient|site of|readmission"
- },
- {
-  "label": "UHC MA reimbursement",
-  "url": "https://www.uhcprovider.com/en/policies-protocols/medicare-advantage-policies/medicare-advantage-reimbursement-policies.html",
-  "explore": true,
-  "match": "bulletin|update"
- },
- {
-  "label": "UHC Community Plan medical (all states)",
-  "url": "https://www.uhcprovider.com/en/policies-protocols/comm-plan-medicaid-policies/medicaid-community-state-policies.html",
-  "explore": true,
-  "match": "bulletin|update|missouri"
- },
- {
-  "label": "UHC commercial medical & drug (bulletins)",
-  "url": "https://www.uhcprovider.com/en/policies-protocols/commercial-policies/commercial-medical-drug-policies.html",
-  "explore": true,
-  "match": "bulletin|update"
- },
- {
-  "label": "Aetna medical CPBs",
+  "label": "Aetna medical CPBs (all links)",
   "url": "https://www.aetna.com/health-care-professionals/clinical-policy-bulletins/medical-clinical-policy-bulletins.html",
   "explore": true,
-  "match": "cpb|alpha|numer|new|update|revis"
+  "match": "."
  },
  {
-  "label": "Anthem policies hub",
-  "url": "https://www.anthem.com/provider/policies/",
-  "explore": true,
-  "match": "missouri|medical-polic|reimburs|update|guideline"
- },
- {
-  "label": "Anthem MO clinical guidelines",
-  "url": "https://www.anthem.com/provider/policies/clinical-guidelines/?cnslocale=en_US_mo",
-  "explore": true,
-  "match": "guideline|update|cg-|polic"
- },
- {
-  "label": "Anthem MO reimbursement",
-  "url": "https://www.anthem.com/provider/policies/reimbursement/?cnslocale=en_US_mo",
-  "explore": true,
-  "match": "reimburs|polic|update"
- },
- {
-  "label": "Anthem MO news RSS a",
-  "url": "https://providernews.anthem.com/missouri/rss",
+  "label": "Anthem updates full list",
+  "url": "https://www.anthem.com/provider/policies/clinical-guidelines/updates",
   "explore": true
- },
- {
-  "label": "Anthem MO news RSS b",
-  "url": "https://providernews.anthem.com/missouri/feed",
-  "explore": true
- },
- {
-  "label": "Healthy Blue news RSS",
-  "url": "https://providernews.healthybluemo.com/rss",
-  "explore": true
- },
- {
-  "label": "MO HealthNet provider manuals",
-  "url": "https://dss.mo.gov/mhd/provider-manuals",
-  "explore": true,
-  "match": "hospital|manual|physician|rural|clinic"
- },
- {
-  "label": "MO HealthNet bulletin: psychotherapy precert",
-  "url": "https://dss.mo.gov/mhd/bulletins/removal-precertification-requirements-psychotherapy-services",
-  "explore": false
- },
- {
-  "label": "CMS transmittals 2026",
-  "url": "https://www.cms.gov/medicare/regulations-guidance/transmittals/2026-transmittals",
-  "explore": true,
-  "match": "transmittal|r\\d"
- },
- {
-  "label": "Home State policies (hospital)",
-  "url": "https://www.homestatehealth.com/providers/tools-resources/clinical-payment-policies.html",
-  "explore": true,
-  "match": "readmission|payment window|observation|inpatient|site of care"
- },
- {
-  "label": "Home State provider news (policy updates)",
-  "url": "https://www.homestatehealth.com/providers/provider-news.html",
-  "explore": true,
-  "match": "policy"
- },
- {
-  "label": "Wellcare MO clinical guidelines",
-  "url": "https://www.wellcare.com/missouri/providers/clinical-guidelines",
-  "explore": true,
-  "match": "polic|guideline|criteria"
- },
- {
-  "label": "Humana MCP by effective date (content)",
-  "url": "https://mcp.humana.com/tad/tad_new/Search.aspx?sortfield=effectivedate&policyType=medical",
-  "explore": true
- },
- {
-  "label": "Humana provider home",
-  "url": "https://provider.humana.com/",
-  "explore": true,
-  "match": "polic|update|news|bulletin"
  }
 ]
