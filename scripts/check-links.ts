@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { fetchSnapshot } from "../lib/extract";
 
-type Entry = { url: string; label?: string; explore?: boolean };
+type Entry = { url: string; label?: string; explore?: boolean; match?: string };
 
 const POLICY_WORDS = /polic|bulletin|update|guideline|coverage|reimburs|payment|manual|news|\.pdf/i;
 
@@ -27,7 +27,8 @@ async function main() {
       console.log(`   OK ${snap.kind}${redirected} | ${snap.lines.length} text lines, ${snap.links.length} links`);
       if (snap.note) console.log(`   NOTE: ${snap.note}`);
       for (const line of snap.lines.slice(0, e.explore ? 12 : 4)) console.log(`   | ${line.slice(0, 140)}`);
-      const links = snap.links.filter((l) => POLICY_WORDS.test(l.url) || POLICY_WORDS.test(l.text));
+      const pattern = e.match ? new RegExp(e.match, "i") : POLICY_WORDS;
+      const links = snap.links.filter((l) => pattern.test(l.url) || pattern.test(l.text));
       for (const l of links.slice(0, e.explore ? 60 : 8)) console.log(`   > ${l.text.slice(0, 70)} — ${l.url}`);
       if (links.length > (e.explore ? 60 : 8)) console.log(`   > …${links.length} policy-related links total`);
     } catch (err) {
