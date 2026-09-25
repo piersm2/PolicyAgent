@@ -24,7 +24,7 @@ export interface Board {
   recentChanges: PolicyChangeWithContext[];
 }
 
-/** Everything on the Home page. Also served as JSON at GET /api/board. */
+/** Home page board data; also part of the compiled feed (lib/feed.ts). */
 export function getBoard(): Board {
   const policies = listPolicies();
   const ranked = rankPolicies(policies, latestPastChangeByPolicy());

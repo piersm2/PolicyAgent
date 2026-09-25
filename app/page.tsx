@@ -2,11 +2,14 @@ import Link from "next/link";
 import { getBoard } from "@/lib/board";
 import { ImpactBadge, StatusBadge } from "@/components/Badges";
 import { formatDate } from "@/lib/format";
+import { listPageChanges } from "@/lib/watch";
+import { WebsiteChanges } from "@/components/WebsiteChanges";
 
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const { counts, needsAttention, recentChanges } = getBoard();
+  const websiteChanges = listPageChanges({ unreviewedOnly: true, limit: 20 });
 
   return (
     <div className="space-y-6">
@@ -18,10 +21,17 @@ export default function HomePage() {
             {counts.payers} payers
           </p>
         </div>
-        <Link href="/policies?new=1" className="btn-primary">
-          + Add policy
-        </Link>
+        <div className="flex gap-2">
+          <a href="/api/feed?format=md" target="_blank" className="btn-ghost">
+            Open feed
+          </a>
+          <Link href="/policies?new=1" className="btn-primary">
+            + Add policy
+          </Link>
+        </div>
       </div>
+
+      {websiteChanges.length > 0 && <WebsiteChanges changes={websiteChanges} />}
 
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="card p-5 lg:col-span-3">

@@ -79,3 +79,13 @@ export function parseChange(body: any) {
     summary: required(body.summary, "summary"),
   };
 }
+
+export function parseWatchPage(body: any) {
+  const payerId = Number(body.payerId);
+  if (!Number.isInteger(payerId) || payerId <= 0) {
+    throw new ValidationError(`"payerId" must reference a valid payer.`);
+  }
+  const url = optUrl(body.url, "url");
+  if (!url) throw new ValidationError(`"url" is required.`);
+  return { payerId, url, label: str(body.label) ?? "Policy page" };
+}

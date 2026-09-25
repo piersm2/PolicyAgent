@@ -51,3 +51,11 @@ export function safeHref(url: string | null | undefined): string | null {
     return null;
   }
 }
+
+/** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") shown in local time, e.g. "Sep 25, 3:04 PM". */
+export function formatDateTime(ts: string | null | undefined): string {
+  if (!ts) return "—";
+  const d = new Date(ts.includes("T") ? ts : ts.replace(" ", "T") + "Z");
+  if (Number.isNaN(d.getTime())) return ts;
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}

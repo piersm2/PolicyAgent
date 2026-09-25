@@ -88,3 +88,39 @@ export interface PolicyChangeWithContext extends PolicyChange {
   policyTitle: string;
   payerName: string;
 }
+
+export interface PageLink {
+  url: string;
+  text: string;
+}
+
+/** A payer web page the app checks for changes. */
+export interface WatchPage {
+  id: number;
+  payerId: number;
+  payerName: string;
+  url: string;
+  label: string;
+  lastCheckedAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  lastNote: string | null;
+  unreviewedChanges: number;
+  createdAt: string;
+}
+
+/** What differed on a watched page between two checks. */
+export interface PageChange {
+  id: number;
+  pageId: number;
+  payerName: string;
+  pageLabel: string;
+  pageUrl: string;
+  detectedAt: string;
+  newLinks: PageLink[];
+  removedLinks: PageLink[];
+  addedText: string[];
+  removedText: string[];
+  fileChanged: boolean;
+  reviewedAt: string | null;
+}

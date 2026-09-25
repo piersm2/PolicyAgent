@@ -2,7 +2,7 @@ import type { PolicyChange, PolicyWithPayer } from "./types";
 import { daysFromToday } from "./format";
 
 // A ranked, explained view of which policies most need attention right now.
-// Deterministic, so the Home board and /api/board always agree.
+// Deterministic, so the Home page and the compiled feed always agree.
 
 export interface RankedPolicy {
   policy: PolicyWithPayer;
