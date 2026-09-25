@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { ValidationError } from "./validate";
 import type {
   Briefing,
   DashboardStats,
@@ -48,21 +49,20 @@ export function createPayer(input: Omit<Payer, "id" | "createdAt">): Payer {
   return getPayer(Number(info.lastInsertRowid))!;
 }
 
-export function updatePayer(id: number, input: Partial<Omit<Payer, "id" | "createdAt">>): Payer | undefined {
-  const existing = getPayer(id);
-  if (!existing) return undefined;
-  const merged = { ...existing, ...input };
+// PUT semantics: the input replaces every editable field.
+export function updatePayer(id: number, input: Omit<Payer, "id" | "createdAt">): Payer | undefined {
+  if (!getPayer(id)) return undefined;
   getDb()
     .prepare(
       `UPDATE payers SET name=@name, type=@type, website=@website, contact=@contact, notes=@notes WHERE id=@id`
     )
     .run({
       id,
-      name: merged.name,
-      type: merged.type,
-      website: merged.website ?? null,
-      contact: merged.contact ?? null,
-      notes: merged.notes ?? null,
+      name: input.name,
+      type: input.type,
+      website: input.website ?? null,
+      contact: input.contact ?? null,
+      notes: input.notes ?? null,
     });
   return getPayer(id);
 }
@@ -131,6 +131,7 @@ export function getPolicy(id: number): PolicyWithPayer | undefined {
 type PolicyInput = Omit<Policy, "id" | "createdAt" | "updatedAt">;
 
 export function createPolicy(input: PolicyInput): PolicyWithPayer {
+  assertPayerExists(input.payerId);
   const info = getDb()
     .prepare(
       `INSERT INTO policies
@@ -142,10 +143,10 @@ export function createPolicy(input: PolicyInput): PolicyWithPayer {
   return getPolicy(Number(info.lastInsertRowid))!;
 }
 
-export function updatePolicy(id: number, input: Partial<PolicyInput>): PolicyWithPayer | undefined {
-  const existing = getPolicy(id);
-  if (!existing) return undefined;
-  const merged = { ...existing, ...input };
+// PUT semantics: the input replaces every editable field.
+export function updatePolicy(id: number, input: PolicyInput): PolicyWithPayer | undefined {
+  if (!getPolicy(id)) return undefined;
+  assertPayerExists(input.payerId);
   getDb()
     .prepare(
       `UPDATE policies SET
@@ -155,12 +156,16 @@ export function updatePolicy(id: number, input: Partial<PolicyInput>): PolicyWit
         updatedAt=datetime('now')
        WHERE id=@id`
     )
-    .run({ id, ...normalizePolicy(merged) });
+    .run({ id, ...normalizePolicy(input) });
   return getPolicy(id);
 }
 
 export function deletePolicy(id: number): boolean {
   return getDb().prepare("DELETE FROM policies WHERE id = ?").run(id).changes > 0;
+}
+
+function assertPayerExists(payerId: number) {
+  if (!getPayer(payerId)) throw new ValidationError(`Payer ${payerId} does not exist.`);
 }
 
 function normalizePolicy(input: PolicyInput) {
@@ -224,18 +229,23 @@ export function createChange(
   return db.prepare("SELECT * FROM policy_changes WHERE id = ?").get(Number(info.lastInsertRowid)) as PolicyChange;
 }
 
-/** All changes grouped by policyId, each list newest-first. For ranking/summaries. */
-export function changesByPolicy(): Map<number, PolicyChange[]> {
+/**
+ * Each policy's most recent change dated today or earlier, keyed by policyId.
+ * Future-dated (pre-announced) changes are skipped so they can't hide recent
+ * activity. Used for ranking, which only needs one change per policy.
+ */
+export function latestPastChangeByPolicy(): Map<number, PolicyChange> {
   const rows = getDb()
-    .prepare("SELECT * FROM policy_changes ORDER BY changeDate DESC, id DESC")
+    .prepare(
+      `SELECT c.* FROM policy_changes c
+       WHERE c.id = (
+         SELECT id FROM policy_changes
+         WHERE policyId = c.policyId AND date(changeDate) <= date('now')
+         ORDER BY changeDate DESC, id DESC LIMIT 1
+       )`
+    )
     .all() as PolicyChange[];
-  const map = new Map<number, PolicyChange[]>();
-  for (const c of rows) {
-    const list = map.get(c.policyId);
-    if (list) list.push(c);
-    else map.set(c.policyId, [c]);
-  }
-  return map;
+  return new Map(rows.map((c) => [c.policyId, c]));
 }
 
 // ---------------------------------------------------------------------------

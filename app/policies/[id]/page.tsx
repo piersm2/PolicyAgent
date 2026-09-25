@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getPolicy, listChangesForPolicy } from "@/lib/repo";
 import { CategoryBadge, ChangeTypeBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
 import { AddChange } from "@/components/AddChange";
-import { formatDate, relativeDays } from "@/lib/format";
+import { formatDate, relativeDays, safeHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
   const policy = getPolicy(id);
   if (!policy) notFound();
   const changes = listChangesForPolicy(id);
+  const sourceHref = safeHref(policy.sourceUrl);
 
   return (
     <div className="space-y-6">
@@ -48,8 +49,8 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
           <div className="flex gap-2">
-            {policy.sourceUrl && (
-              <a href={policy.sourceUrl} target="_blank" rel="noreferrer" className="btn-primary text-sm">
+            {sourceHref && (
+              <a href={sourceHref} target="_blank" rel="noreferrer" className="btn-primary text-sm">
                 Open source ↗
               </a>
             )}

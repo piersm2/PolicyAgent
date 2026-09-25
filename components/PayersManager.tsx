@@ -5,6 +5,7 @@ import Link from "next/link";
 import { apiGet, apiSend } from "@/lib/client";
 import { PAYER_TYPES, type Payer } from "@/lib/types";
 import { Modal } from "./Modal";
+import { safeHref } from "@/lib/format";
 
 type PayerWithCount = Payer & { policyCount: number };
 
@@ -12,6 +13,7 @@ export function PayersManager({ initial }: { initial: PayerWithCount[] }) {
   const [payers, setPayers] = useState<PayerWithCount[]>(initial);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Payer | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function reload() {
     // Counts come from the server page; re-fetch the base list and preserve counts where possible.
@@ -30,8 +32,14 @@ export function PayersManager({ initial }: { initial: PayerWithCount[] }) {
         ? `Delete ${p.name}? This also deletes its ${p.policyCount} ${p.policyCount === 1 ? "policy" : "policies"} and their history.`
         : `Delete ${p.name}?`;
     if (!confirm(msg)) return;
-    await apiSend(`/api/payers/${p.id}`, "DELETE");
-    setPayers((prev) => prev.filter((x) => x.id !== p.id));
+    try {
+      await apiSend(`/api/payers/${p.id}`, "DELETE");
+      setPayers((prev) => prev.filter((x) => x.id !== p.id));
+      setError(null);
+    } catch (err) {
+      setError(`Couldn't delete ${p.name}: ${err instanceof Error ? err.message : "unknown error"}`);
+      reload().catch(() => {}); // resync; the payer may already be gone
+    }
   }
 
   return (
@@ -52,6 +60,8 @@ export function PayersManager({ initial }: { initial: PayerWithCount[] }) {
         </button>
       </div>
 
+      {error && <div className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {payers.map((p) => (
           <div key={p.id} className="card flex flex-col p-4">
@@ -69,9 +79,9 @@ export function PayersManager({ initial }: { initial: PayerWithCount[] }) {
 
             <div className="mt-3 space-y-1 text-xs text-slate-500">
               {p.contact && <div>☎ {p.contact}</div>}
-              {p.website && (
-                <a href={p.website} target="_blank" rel="noreferrer" className="block truncate text-brand-600 hover:underline">
-                  {p.website.replace(/^https?:\/\//, "")}
+              {safeHref(p.website) && (
+                <a href={safeHref(p.website)!} target="_blank" rel="noreferrer" className="block truncate text-brand-600 hover:underline">
+                  {p.website!.replace(/^https?:\/\//, "")}
                 </a>
               )}
               {p.notes && <p className="pt-1 text-slate-500">{p.notes}</p>}

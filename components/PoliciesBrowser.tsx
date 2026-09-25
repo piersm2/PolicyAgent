@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { apiGet, apiSend } from "@/lib/client";
 import {
@@ -43,6 +43,7 @@ export function PoliciesBrowser({
     ...initialFilters,
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(openNew);
   const [editing, setEditing] = useState<PolicyWithPayer | null>(null);
 
@@ -56,29 +57,48 @@ export function PoliciesBrowser({
     return sp.toString();
   }, [filters]);
 
+  // Only the newest request may update state, so a slow earlier search can't
+  // overwrite the results of a later one.
+  const requestId = useRef(0);
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
     try {
       const data = await apiGet<PolicyWithPayer[]>(`/api/policies?${query}`);
+      if (id !== requestId.current) return;
       setPolicies(data);
+      setError(null);
+    } catch (err) {
+      if (id === requestId.current) setError(err instanceof Error ? err.message : "Failed to load policies");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, [query]);
 
-  // Debounced reload whenever filters change.
+  // Debounced reload when filters change. The server already rendered the
+  // initial filters, so skip until the query actually differs from it.
+  const lastQuery = useRef(query);
   useEffect(() => {
+    if (query === lastQuery.current) return;
+    lastQuery.current = query;
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [query, load]);
 
   const set = (k: keyof Filters, v: string) => setFilters((f) => ({ ...f, [k]: v }));
   const activeFilterCount = Object.entries(filters).filter(([, v]) => v).length;
 
   async function remove(p: PolicyWithPayer) {
     if (!confirm(`Delete "${p.title}"? This also removes its change history.`)) return;
-    await apiSend(`/api/policies/${p.id}`, "DELETE");
-    load();
+    let failure: string | null = null;
+    try {
+      await apiSend(`/api/policies/${p.id}`, "DELETE");
+    } catch (err) {
+      failure = `Couldn't delete "${p.title}": ${err instanceof Error ? err.message : "unknown error"}`;
+    }
+    // Reload either way (the row may already be gone), then surface any failure.
+    await load();
+    if (failure) setError(failure);
   }
 
   return (
@@ -102,6 +122,8 @@ export function PoliciesBrowser({
           + Add policy
         </button>
       </div>
+
+      {error && <div className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
 
       {/* Filters */}
       <div className="card p-3">

@@ -6,6 +6,8 @@ import {
   POLICY_STATUSES,
 } from "./types";
 
+import { safeHref, todayLocal } from "./format";
+
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -37,7 +39,19 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function optDate(v: unknown, field: string): string | null {
   const s = str(v);
   if (!s) return null;
-  if (!DATE_RE.test(s)) throw new ValidationError(`"${field}" must be a valid date (YYYY-MM-DD).`);
+  const invalid = new ValidationError(`"${field}" must be a valid date (YYYY-MM-DD).`);
+  if (!DATE_RE.test(s)) throw invalid;
+  // Reject impossible dates like 2026-02-30, which JS would roll over to March.
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) throw invalid;
+  return s;
+}
+
+function optUrl(v: unknown, field: string): string | null {
+  const s = str(v);
+  if (!s) return null;
+  if (!safeHref(s)) throw new ValidationError(`"${field}" must be an http:// or https:// URL.`);
   return s;
 }
 
@@ -45,7 +59,7 @@ export function parsePayer(body: any) {
   return {
     name: required(body.name, "name"),
     type: oneOf(body.type, PAYER_TYPES, "type"),
-    website: str(body.website),
+    website: optUrl(body.website, "website"),
     contact: str(body.contact),
     notes: str(body.notes),
   };
@@ -67,14 +81,14 @@ export function parsePolicy(body: any) {
     endDate: optDate(body.endDate, "endDate"),
     nextReviewDate: optDate(body.nextReviewDate, "nextReviewDate"),
     version: str(body.version),
-    sourceUrl: str(body.sourceUrl),
+    sourceUrl: optUrl(body.sourceUrl, "sourceUrl"),
     summary: str(body.summary),
   };
 }
 
 export function parseChange(body: any) {
   return {
-    changeDate: optDate(body.changeDate, "changeDate") ?? new Date().toISOString().slice(0, 10),
+    changeDate: optDate(body.changeDate, "changeDate") ?? todayLocal(),
     changeType: oneOf(body.changeType ?? "Revised", CHANGE_TYPES, "changeType"),
     version: str(body.version),
     summary: required(body.summary, "summary"),

@@ -77,9 +77,13 @@ export function getDb(): Database.Database {
   const db = new Database(DB_PATH);
   initSchema(db);
 
-  // Seed on first run (empty payers table).
-  const count = (db.prepare("SELECT COUNT(*) AS n FROM payers").get() as { n: number }).n;
-  if (count === 0) seed(db);
+  // Seed exactly once, when the database is first created. user_version marks
+  // it done, so a user who deletes every payer doesn't get the demo data back.
+  if (db.pragma("user_version", { simple: true }) === 0) {
+    const count = (db.prepare("SELECT COUNT(*) AS n FROM payers").get() as { n: number }).n;
+    if (count === 0) seed(db);
+    db.pragma("user_version = 1");
+  }
 
   global.__policyAgentDb = db;
   return db;

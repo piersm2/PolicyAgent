@@ -5,6 +5,9 @@ import { daysFromToday } from "./format";
 // Deterministic — no external calls — so it works with zero configuration and
 // gives the AI summary a stable, factual base to write from.
 
+/** How many top-ranked policies the briefing covers (queue and summary alike). */
+export const BRIEFING_SIZE = 6;
+
 export interface RankedPolicy {
   policy: PolicyWithPayer;
   score: number;
@@ -28,16 +31,16 @@ const CATEGORY_POINTS: Record<string, number> = {
 
 export function rankPolicies(
   policies: PolicyWithPayer[],
-  changesByPolicy: Map<number, PolicyChange[]>
+  latestChange: Map<number, PolicyChange>
 ): RankedPolicy[] {
   const ranked = policies
     .filter((p) => p.status !== "Retired")
-    .map((p) => score(p, changesByPolicy.get(p.id) ?? []));
+    .map((p) => score(p, latestChange.get(p.id)));
 
   return ranked.sort((a, b) => b.score - a.score);
 }
 
-function score(policy: PolicyWithPayer, changes: PolicyChange[]): RankedPolicy {
+function score(policy: PolicyWithPayer, mostRecent: PolicyChange | undefined): RankedPolicy {
   let score = 0;
   const reasons: string[] = [];
 
@@ -79,8 +82,7 @@ function score(policy: PolicyWithPayer, changes: PolicyChange[]): RankedPolicy {
     }
   }
 
-  // Recent activity.
-  const mostRecent = changes[0]; // repo returns newest-first
+  // Recent activity (latest change dated today or earlier).
   if (mostRecent) {
     const age = daysFromToday(mostRecent.changeDate);
     if (age !== null && age <= 0) {

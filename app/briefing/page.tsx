@@ -1,12 +1,12 @@
-import { changesByPolicy, listBriefings, listPolicies } from "@/lib/repo";
-import { rankPolicies } from "@/lib/priority";
+import { latestPastChangeByPolicy, listBriefings, listPolicies } from "@/lib/repo";
+import { BRIEFING_SIZE, rankPolicies } from "@/lib/priority";
 import { BriefingPanel, type RankedItem } from "@/components/BriefingPanel";
 
 export const dynamic = "force-dynamic";
 
 export default function BriefingPage() {
-  const ranked = rankPolicies(listPolicies(), changesByPolicy());
-  const priorities: RankedItem[] = ranked.slice(0, 8).map((r) => ({
+  const ranked = rankPolicies(listPolicies(), latestPastChangeByPolicy());
+  const priorities: RankedItem[] = ranked.slice(0, BRIEFING_SIZE).map((r) => ({
     id: r.policy.id,
     title: r.policy.title,
     payerName: r.policy.payerName,

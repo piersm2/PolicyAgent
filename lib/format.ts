@@ -33,3 +33,21 @@ export function relativeDays(iso: string | null | undefined): string {
   if (diff === -1) return "1 day ago";
   return diff > 0 ? `in ${diff} days` : `${Math.abs(diff)} days ago`;
 }
+
+/** Today's date (YYYY-MM-DD) in the local time zone, for form and API defaults. */
+export function todayLocal(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Returns the URL only if it is http(s); anything else (e.g. javascript:) is dropped. */
+export function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}

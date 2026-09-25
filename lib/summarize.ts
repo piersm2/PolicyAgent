@@ -1,12 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Briefing } from "./types";
-import { changesByPolicy, listPolicies, storeBriefing } from "./repo";
-import { rankPolicies, type RankedPolicy } from "./priority";
+import { latestPastChangeByPolicy, listPolicies, storeBriefing } from "./repo";
+import { BRIEFING_SIZE, rankPolicies, type RankedPolicy } from "./priority";
 import { formatDate, relativeDays } from "./format";
 
 // Default to the latest Opus; override with POLICYAGENT_MODEL if desired.
 const MODEL = process.env.POLICYAGENT_MODEL || "claude-opus-5";
-const TOP_N = 6;
 
 /**
  * Generate a briefing that summarizes the most important tracked policies and
@@ -14,8 +13,8 @@ const TOP_N = 6;
  * a deterministic, rule-based narrative so the feature always works.
  */
 export async function generateBriefing(): Promise<Briefing> {
-  const ranked = rankPolicies(listPolicies(), changesByPolicy());
-  const top = ranked.slice(0, TOP_N);
+  const ranked = rankPolicies(listPolicies(), latestPastChangeByPolicy());
+  const top = ranked.slice(0, BRIEFING_SIZE);
 
   if (top.length === 0) {
     return storeBriefing({
