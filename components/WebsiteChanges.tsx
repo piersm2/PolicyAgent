@@ -36,7 +36,7 @@ export function WebsiteChanges({
 
   return (
     <section className="card p-5">
-      <h2 className="font-semibold text-slate-900">{title}</h2>
+      <h2 className="font-bold text-slate-900">{title}</h2>
       <p className="mb-4 text-xs text-slate-500">{subtitle}</p>
       {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <ul className="space-y-3">

@@ -1,8 +1,8 @@
 import type { Impact, PolicyStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<PolicyStatus, string> = {
-  Active: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
-  Upcoming: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
+  Active: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
+  Upcoming: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70",
 };
 
 export function StatusBadge({ status }: { status: PolicyStatus }) {
@@ -10,9 +10,9 @@ export function StatusBadge({ status }: { status: PolicyStatus }) {
 }
 
 const IMPACT_STYLES: Record<Impact, string> = {
-  High: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
-  Medium: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
-  Low: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+  High: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200/70",
+  Medium: "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200/70",
+  Low: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/70",
 };
 
 export function ImpactBadge({ impact }: { impact: Impact }) {

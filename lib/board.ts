@@ -6,6 +6,7 @@ import type { Impact, PolicyChangeWithContext, PolicyStatus } from "./types";
 
 const NEEDS_ATTENTION_SIZE = 8;
 const RECENT_CHANGES_SIZE = 6;
+const REVIEW_SOON_DAYS = 30;
 
 export interface AttentionItem {
   id: number;
@@ -31,7 +32,16 @@ export interface ActionItem {
 }
 
 export interface Board {
-  counts: { policies: number; upcoming: number; highImpact: number; payers: number; openActions: number; overdueActions: number };
+  counts: {
+    policies: number;
+    upcoming: number;
+    highImpact: number;
+    payers: number;
+    openActions: number;
+    overdueActions: number;
+    /** Policies whose next review is overdue or within REVIEW_SOON_DAYS. */
+    reviewsDue: number;
+  };
   needsAttention: AttentionItem[];
   actionItems: ActionItem[];
   recentChanges: PolicyChangeWithContext[];
@@ -59,6 +69,7 @@ export function getBoard(): Board {
       payers: countPayers(),
       openActions: actionItems.length,
       overdueActions: actionItems.filter((a) => a.overdue).length,
+      reviewsDue: policies.filter((p) => (daysFromToday(p.nextReviewDate) ?? Infinity) <= REVIEW_SOON_DAYS).length,
     },
     actionItems,
     needsAttention: ranked.slice(0, NEEDS_ATTENTION_SIZE).map(({ policy: p, score, reasons }) => ({

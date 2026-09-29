@@ -45,7 +45,7 @@ export function PayersManager({ payers }: { payers: PayerWithCount[] }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Payers</h1>
+          <h1 className="page-title">Payers</h1>
           <p className="text-sm text-slate-500">{payers.length} payers tracked</p>
         </div>
         <div className="flex gap-2">
@@ -69,7 +69,7 @@ export function PayersManager({ payers }: { payers: PayerWithCount[] }) {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {payers.map((p) => (
-          <div key={p.id} className="card flex flex-col p-4">
+          <div key={p.id} className="card flex min-w-0 flex-col p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-semibold text-slate-900">{p.name}</h3>

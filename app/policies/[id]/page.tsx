@@ -45,7 +45,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
               <ImpactBadge impact={policy.impact} />
               <CategoryBadge category={policy.category} />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">{policy.title}</h1>
+            <h1 className="page-title">{policy.title}</h1>
             <div className="mt-1 text-sm text-slate-500">
               <Link href={`/policies?payerId=${policy.payerId}`} className="hover:text-brand-700">
                 {policy.payerName}
@@ -86,7 +86,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
 
       {/* The policy's own document */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Policy document</h2>
+        <h2 className="text-lg font-bold text-slate-900">Policy document</h2>
         {!policy.sourceUrl ? (
           <p className="mt-1 text-sm text-slate-400">No document link. Edit the policy to add one and watch it.</p>
         ) : !watch ? (
@@ -124,7 +124,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
       <div className="card p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Change history</h2>
+            <h2 className="text-lg font-bold text-slate-900">Change history</h2>
             <p className="text-sm text-slate-500">
               {changes.length} {changes.length === 1 ? "entry" : "entries"}
             </p>
