@@ -2,6 +2,7 @@ import { getBoard } from "./board";
 import { listPolicies } from "./repo";
 import { checkEveryHours, listPageChanges, listWatchPages } from "./watch";
 import { TIME_ZONE, formatDateTime, isoUtc } from "./format";
+import { getBriefState } from "./summaries";
 
 // The compiled feed Cowork (or any tool) reads: website changes waiting for
 // review, the ranked "needs attention" list, recent logged changes, watch-list
@@ -27,6 +28,7 @@ export function compileFeed(origin: string) {
       ...c,
       detectedAt: isoUtc(c.detectedAt),
       reviewedAt: isoUtc(c.reviewedAt),
+      aiSummaryAt: isoUtc(c.aiSummaryAt),
       markReviewed: `POST ${origin}/api/website-changes/${c.id}/review`,
     })),
     actionItems: board.actionItems.map((a) => ({
@@ -47,25 +49,33 @@ export function compileFeed(origin: string) {
       note: p.lastNote,
       unreviewedChanges: p.unreviewedChanges,
     })),
-    policies: listPolicies().map((p) => ({
-      id: p.id,
-      payer: p.payerName,
-      title: p.title,
-      category: p.category,
-      impact: p.impact,
-      status: p.status,
-      effectiveDate: p.effectiveDate,
-      reviewDate: p.nextReviewDate,
-      reviewEveryMonths: p.reviewEveryMonths,
-      lastReviewedAt: p.lastReviewedAt,
-      owner: p.owner,
-      nextAction: p.nextAction,
-      actionDue: p.actionDue,
-      documentUrl: p.sourceUrl,
-      documentWatched: p.documentWatchId !== null,
-      notes: p.summary,
-      url: `${origin}/policies/${p.id}`,
-    })),
+    policies: listPolicies().map((p) => {
+      const brief = getBriefState(p.id);
+      return {
+        id: p.id,
+        payer: p.payerName,
+        title: p.title,
+        category: p.category,
+        impact: p.impact,
+        status: p.status,
+        effectiveDate: p.effectiveDate,
+        reviewDate: p.nextReviewDate,
+        reviewEveryMonths: p.reviewEveryMonths,
+        lastReviewedAt: p.lastReviewedAt,
+        owner: p.owner,
+        nextAction: p.nextAction,
+        actionDue: p.actionDue,
+        documentUrl: p.sourceUrl,
+        documentWatched: p.documentWatchId !== null,
+        notes: p.summary,
+        // Plain-language brief written by Claude from the document; briefStatus "stale" means
+        // the document changed since it was written.
+        brief: brief.brief,
+        briefStatus: brief.status,
+        briefWrittenAt: isoUtc(brief.briefAt),
+        url: `${origin}/policies/${p.id}`,
+      };
+    }),
   };
 }
 
@@ -91,6 +101,13 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
     const about = ch.policyTitle ? `policy "${ch.policyTitle}"` : ch.pageLabel;
     out.push(`\n### ${ch.payerName} — ${about} (change #${ch.id}, detected ${formatDateTime(ch.detectedAt)})`);
     out.push(`Page: ${ch.pageUrl}`);
+    if (ch.aiSummary) {
+      const a = ch.aiSummary;
+      out.push(`**Summary (Claude; relevance: ${a.relevance}): ${a.headline}.** ${a.whatChanged}`);
+      out.push(`Why it matters: ${a.whyItMatters}`);
+      if (a.suggestedAction) out.push(`Suggested next step: ${a.suggestedAction}`);
+      out.push(`Raw differences:`);
+    }
     if (ch.fileChanged) out.push(`- The document at this address changed.`);
     list(out, "New links / documents", ch.newLinks.map((l) => `${l.text} — ${l.url}`));
     list(out, "Removed links / documents", ch.removedLinks.map((l) => `${l.text} — ${l.url}`));
@@ -134,7 +151,11 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
         (p.owner ? ` | owner ${p.owner}` : "") +
         (p.nextAction ? ` | next action: ${p.nextAction}${p.actionDue ? ` (due ${p.actionDue})` : ""}` : "") +
         (p.documentUrl ? ` | document ${p.documentUrl}${p.documentWatched ? " (watched)" : ""}` : "") +
-        (p.notes ? `\n  ${p.notes}` : "")
+        (p.notes ? `\n  Notes: ${p.notes}` : "") +
+        (p.brief
+          ? `\n  In short: ${p.brief.inShort}\n  What it means for us: ${p.brief.whatItMeansForUs}` +
+            (p.briefStatus === "stale" ? " (brief predates the latest document change)" : "")
+          : "")
     );
   }
 
@@ -142,6 +163,8 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
   out.push(`- JSON version: ${origin}/api/feed`);
   out.push(`- After reviewing a website change, mark it reviewed: POST ${origin}/api/website-changes/<id>/review`);
   out.push(`- Mark a policy reviewed (rolls its review date forward): POST ${origin}/api/policies/<id>/review`);
+  out.push(`- Write or refresh a policy's brief from its document: POST ${origin}/api/policies/<id>/brief`);
+  out.push(`- Have Claude summarize a website change now: POST ${origin}/api/website-changes/<id>/summarize`);
   out.push(`- Mark a policy's next action done: POST ${origin}/api/policies/<id>/action-done`);
   out.push(`- Log a change on a policy: POST ${origin}/api/policies/<id>/changes with {"changeDate":"YYYY-MM-DD","summary":"..."}`);
   out.push(`- Add a policy: POST ${origin}/api/policies (see README for fields)`);

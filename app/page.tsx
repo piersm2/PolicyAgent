@@ -4,6 +4,8 @@ import { ImpactBadge } from "@/components/Badges";
 import { TIME_ZONE, daysFromToday, formatDate } from "@/lib/format";
 import { listPageChanges, listWatchPages } from "@/lib/watch";
 import { WebsiteChanges } from "@/components/WebsiteChanges";
+import { aiEnabled } from "@/lib/ai";
+import { usageSummary, type UsagePeriod } from "@/lib/summaries";
 
 export const dynamic = "force-dynamic";
 
@@ -139,7 +141,7 @@ export default function HomePage() {
       <div className="grid gap-6 lg:grid-cols-5">
         <div id="changes" className="min-w-0 scroll-mt-24 lg:col-span-3">
           {websiteChanges.length > 0 ? (
-            <WebsiteChanges changes={websiteChanges} />
+            <WebsiteChanges changes={websiteChanges} aiOn={aiEnabled()} />
           ) : (
             <section className="card flex items-center gap-4 p-5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-lg text-emerald-600">
@@ -177,6 +179,8 @@ export default function HomePage() {
               </ul>
             )}
           </section>
+
+          <UsageCard />
 
           <section className="card p-5">
             <h2 className="mb-3 font-bold text-slate-900">Recent logged changes</h2>
@@ -227,6 +231,51 @@ function StatTile({
       <div className="text-xs text-slate-500">{note}</div>
     </Link>
   );
+}
+
+function UsageCard() {
+  const usage = usageSummary();
+  const on = aiEnabled();
+  if (!on && usage.month.calls === 0) {
+    return (
+      <section className="card p-5">
+        <h2 className="font-bold text-slate-900">Claude usage</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          AI briefs and summaries are off. Add an Anthropic API key to turn them on (README → AI briefs and summaries).
+        </p>
+      </section>
+    );
+  }
+  const periods: [string, UsagePeriod][] = [
+    ["Today", usage.today],
+    ["This week", usage.week],
+    ["This month", usage.month],
+  ];
+  return (
+    <section className="card p-5">
+      <h2 className="font-bold text-slate-900">Claude usage</h2>
+      <p className="mb-3 text-xs text-slate-500">Estimated cost of AI briefs and change summaries.</p>
+      <div className="grid grid-cols-3 gap-2">
+        {periods.map(([label, p]) => (
+          <div key={label} className="rounded-xl bg-slate-50 px-3 py-2.5">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
+            <div className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-900">{formatCost(p.cost)}</div>
+            <div className="text-xs text-slate-500">
+              {p.calls} {p.calls === 1 ? "summary" : "summaries"}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-slate-400">From token counts at list prices; your Anthropic bill is the final word.</p>
+    </section>
+  );
+}
+
+function formatCost(cost: number | null): string {
+  if (cost === null) return "n/a";
+  if (cost === 0) return "$0";
+  if (cost < 0.01) return "<$0.01";
+  return `$${cost.toFixed(2)}`;
 }
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {

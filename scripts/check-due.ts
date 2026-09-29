@@ -4,9 +4,12 @@
 //   npm run check-due
 //
 // If the app is running, the check goes through it so it joins the app's
-// queue; otherwise the pages are checked directly against the database.
+// queue (and the app writes Claude summaries afterwards); otherwise the pages
+// are checked directly against the database and summaries are written here.
 
+import "./load-env";
 import { checkPages, type CheckResult } from "../lib/watch";
+import { scheduleSummaries } from "../lib/summaries";
 
 const port = process.env.PORT || "3000";
 
@@ -29,7 +32,10 @@ async function viaServer(): Promise<CheckResult[] | null> {
 async function main() {
   let results = await viaServer();
   const where = results ? "through the running app" : "directly (app not running)";
-  if (!results) results = await checkPages("due");
+  if (!results) {
+    results = await checkPages("due");
+    await scheduleSummaries();
+  }
 
   const count = (o: string) => results!.filter((r) => r.outcome === o).length;
   console.log(

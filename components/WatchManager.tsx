@@ -13,10 +13,12 @@ export function WatchManager({
   pages,
   payers,
   checkEveryHours,
+  ai,
 }: {
   pages: WatchPage[];
   payers: Payer[];
   checkEveryHours: number;
+  ai: { on: boolean; calls: number; cost: number | null };
 }) {
   const router = useRouter();
   const [checking, setChecking] = useState<number | "all" | null>(null);
@@ -66,6 +68,13 @@ export function WatchManager({
           <p className="text-sm text-slate-500">
             Payer pages and policy documents checked for changes every {checkEveryHours} hours while the app is
             running. In a codespace, the “Scheduled payer check” GitHub Action wakes it daily (see the README).
+          </p>
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            {ai.on
+              ? `Claude summaries this month: ${ai.calls}${
+                  ai.cost !== null && ai.calls ? ` · about $${ai.cost < 0.01 ? "0.01" : ai.cost.toFixed(2)}` : ""
+                }`
+              : "Claude summaries are off. Add an Anthropic API key to turn them on (README → AI briefs and summaries)."}
           </p>
         </div>
         <div className="flex gap-2">

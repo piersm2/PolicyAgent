@@ -8,15 +8,28 @@ export const TIME_ZONE = process.env.NEXT_PUBLIC_TIME_ZONE || "America/Chicago";
 
 const DAY_MS = 86_400_000;
 
+// en-CA formats as YYYY-MM-DD.
+const ZONE_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 /** Today's calendar date (YYYY-MM-DD) in TIME_ZONE. */
 export function today(): string {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  return ZONE_DATE.format(new Date());
+}
+
+/** The calendar date (YYYY-MM-DD, in TIME_ZONE) of a stored UTC timestamp. */
+export function dateInZone(ts: string): string {
+  return ZONE_DATE.format(parseTimestamp(ts));
+}
+
+/** Monday of the week containing a calendar date. */
+export function startOfWeek(date: string): string {
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(date, -((weekday + 6) % 7));
 }
 
 /** A calendar date shifted by whole days, e.g. addDays("2026-09-25", 30). */

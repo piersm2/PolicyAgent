@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { fetchSnapshot, normalizeLinkUrl, type Snapshot } from "./extract";
 import { ValidationError } from "./validate";
+import { scheduleSummaries } from "./summaries";
 import type { PageChange, PageLink, WatchPage } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,7 @@ export function listPageChanges(
     addedText: JSON.parse(r.addedText),
     removedText: JSON.parse(r.removedText),
     fileChanged: Boolean(r.fileChanged),
+    aiSummary: r.aiSummary ? JSON.parse(r.aiSummary) : null,
   }));
 }
 
@@ -119,6 +121,8 @@ export function checkPages(which: "all" | "due" | number[]): Promise<CheckResult
     .catch(() => {})
     .then(() => runChecks(which));
   global.__policyAgentCheckQueue = run;
+  // Claude summaries of new changes (and briefs of changed documents) follow in the background.
+  run.then(() => scheduleSummaries()).catch(() => {});
   return run;
 }
 
@@ -167,7 +171,11 @@ async function checkPage(pageId: number): Promise<CheckResult> {
     return { pageId, outcome: "error", error };
   }
 
-  const prev: Snapshot | null = page.snapshot ? JSON.parse(page.snapshot) : null;
+  const stored: Snapshot | null = page.snapshot ? JSON.parse(page.snapshot) : null;
+  // If the way the page is read changed (it's now followed to its document, or loaded in a
+  // browser), comparing old and new would flag everything: start a new baseline instead.
+  const prev =
+    stored && stored.kind === snap.kind && Boolean(stored.rendered) === Boolean(snap.rendered) ? stored : null;
   let result: CheckResult = { pageId, outcome: prev ? "unchanged" : "baseline" };
 
   const save = db.transaction(() => {
@@ -197,15 +205,18 @@ function diffSnapshots(prev: Snapshot, next: Snapshot) {
   // Normalize both sides: snapshots taken before normalization existed still hold raw URLs.
   const prevUrls = new Set(prev.links.map((l) => normalizeLinkUrl(l.url)));
   const nextUrls = new Set(next.links.map((l) => normalizeLinkUrl(l.url)));
+  // PDFs checked before text extraction existed have no lines; comparing against
+  // them would report every line as added, so only the file change is reported.
+  const legacyFile = prev.kind === "file" && prev.lines.length === 0;
   const prevLines = new Set(prev.lines);
-  const nextLines = new Set(next.lines);
+  const nextLines = new Set(legacyFile ? [] : next.lines);
 
   const newLinks: PageLink[] = next.links.filter((l) => !prevUrls.has(normalizeLinkUrl(l.url))).slice(0, MAX_ITEMS_PER_LIST);
   const removedLinks: PageLink[] = prev.links.filter((l) => !nextUrls.has(normalizeLinkUrl(l.url))).slice(0, MAX_ITEMS_PER_LIST);
   // A list item that is just a new link's title is already reported as a link.
   const newLinkText = new Set(newLinks.map((l) => l.text));
   const removedLinkText = new Set(removedLinks.map((l) => l.text));
-  const addedText = next.lines
+  const addedText = (legacyFile ? [] : next.lines)
     .filter((l) => !prevLines.has(l) && !newLinkText.has(l))
     .slice(0, MAX_ITEMS_PER_LIST);
   const removedText = prev.lines

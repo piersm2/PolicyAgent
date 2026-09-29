@@ -13,6 +13,10 @@ echo Installing or updating dependencies...
 call npm install --no-audit --no-fund
 if errorlevel 1 goto failed
 
+echo Installing the page reader for payer pages built by JavaScript (first run downloads about 150 MB)...
+call npx playwright-core install chromium
+if errorlevel 1 echo The page reader could not be installed; pages built by JavaScript will be skipped.
+
 echo Building the app...
 call npm run build
 if errorlevel 1 goto failed
