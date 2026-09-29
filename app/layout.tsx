@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PolicyAgent — Payer Policy Tracker",
+  title: "Payer Policy Watch",
   description:
     "Track health-plan medical, reimbursement, and coverage policies, their effective dates, and change history.",
 };
@@ -34,8 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </svg>
                 </span>
                 <div className="leading-tight">
-                  <div className="font-semibold text-slate-900">PolicyAgent</div>
-                  <div className="text-xs text-slate-500">Payer Policy Tracker</div>
+                  <div className="font-semibold text-slate-900">Payer Policy Watch</div>
+                  <div className="text-xs text-slate-500">Policy changes, reviews &amp; follow-ups</div>
                 </div>
               </Link>
               <nav className="flex items-center gap-1">
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
           <footer className="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
-            PolicyAgent · Local demo tracker · Data is illustrative and not a substitute for the payer&apos;s
+            Payer Policy Watch · Sample data is illustrative and not a substitute for the payer&apos;s
             official policy documentation.
           </footer>
         </div>

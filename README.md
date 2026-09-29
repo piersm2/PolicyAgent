@@ -1,4 +1,4 @@
-# PolicyAgent — Payer Policy Compiler
+# Payer Policy Watch
 
 Compiles health-plan payer policy information into one feed that Cowork (or any
 tool) can read:
@@ -17,7 +17,7 @@ tool) can read:
 
 Requires **Node.js 20.18 or newer**. The current LTS from https://nodejs.org is fine.
 
-**Windows:** download or clone this repo, then double-click **`Start PolicyAgent.cmd`**.
+**Windows:** download or clone this repo, then double-click **`Start Payer Policy Watch.cmd`**.
 It installs what's needed, builds the app, starts it, and opens your browser. Keep the
 window open while you use the app; close it to stop.
 

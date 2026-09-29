@@ -22,7 +22,7 @@ const MAX_LINKS = 3000;
 const MAX_LINE_LENGTH = 500;
 // Many payer sites reject requests that don't look like a browser.
 const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 PolicyAgent/1.0";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 PayerPolicyWatch/1.0";
 
 export async function fetchSnapshot(url: string): Promise<Snapshot> {
   let res: Response;

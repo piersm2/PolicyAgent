@@ -1,5 +1,5 @@
 {
-  "name": "PolicyAgent",
+  "name": "Payer Policy Watch",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
   "features": {
     "ghcr.io/devcontainers/features/sshd:1": {}
@@ -9,7 +9,7 @@
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "PolicyAgent",
+      "label": "Payer Policy Watch",
       "onAutoForward": "openBrowser"
     }
   }
