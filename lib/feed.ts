@@ -188,6 +188,7 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
   out.push(`- Add a policy: POST ${origin}/api/policies (see README for fields)`);
   out.push(`- Check watched pages now: POST ${origin}/api/watch/check`);
   out.push(`- Full imported history: GET ${origin}/api/history?relevance=all&since=YYYY-MM-DD`);
+  out.push(`- Daily reading tasks for Cowork (briefs, summaries, history imports): ${origin}/cowork (JSON: ${origin}/api/cowork)`);
 
   return out.join("\n") + "\n";
 }

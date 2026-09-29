@@ -155,7 +155,7 @@ export function PolicyBriefCard({
             {status === "error" && "Check the document link, then try again."}
             {status === "no-document" && "Add the policy document link (Edit) to get a plain-language brief."}
             {status === "disabled" &&
-              "Turn on AI briefs by adding an Anthropic API key. See “AI briefs and summaries” in the README."}
+              "Your daily Cowork task writes this brief (see Cowork tasks). With an Anthropic API key, the app writes it itself."}
           </p>
         )
       )}

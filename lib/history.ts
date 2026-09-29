@@ -11,7 +11,8 @@ import type { PageLink, PolicyCategory, Relevance } from "./types";
 // Claude read each one and list the policy changes it announced. Jobs are queued
 // and processed one document at a time in the background; they survive restarts.
 
-export type JobStatus = "discovering" | "ready" | "queued" | "running" | "done" | "failed" | "cancelled";
+// "cowork": waiting for the daily Cowork task (no API key), which does the import itself.
+export type JobStatus = "discovering" | "ready" | "queued" | "running" | "done" | "failed" | "cancelled" | "cowork";
 
 export interface ImportJob {
   id: number;
@@ -98,7 +99,6 @@ function getJob(id: number): ImportJob | undefined {
 
 /** Queue discovery for each listing page; documents are imported after you start the job. */
 export function createImportJobs(pageIds: number[], months: number): ImportJob[] {
-  if (!aiEnabled()) throw new ValidationError("The historical import needs an Anthropic API key (see the README).");
   if (![3, 6, 12, 24].includes(months)) throw new ValidationError('"months" must be 3, 6, 12, or 24.');
   const db = getDb();
   const since = addMonths(today(), -months);
@@ -111,10 +111,12 @@ export function createImportJobs(pageIds: number[], months: number): ImportJob[]
       if (!page) throw new ValidationError(`Watched page ${pageId} doesn't exist.`);
       if (page.policyId) throw new ValidationError("Pick listing pages, not a single policy's document.");
       const active = db
-        .prepare("SELECT 1 FROM import_jobs WHERE pageId = ? AND status IN ('discovering','ready','queued','running')")
+        .prepare("SELECT 1 FROM import_jobs WHERE pageId = ? AND status IN ('discovering','ready','queued','running','cowork')")
         .get(pageId);
       if (active) continue; // already in the queue
-      ids.push(Number(db.prepare("INSERT INTO import_jobs (pageId, sinceDate, status) VALUES (?, ?, 'discovering')").run(pageId, since).lastInsertRowid));
+      // Without an API key, the daily Cowork task does the import (see lib/cowork.ts).
+      const status = aiEnabled() ? "discovering" : "cowork";
+      ids.push(Number(db.prepare("INSERT INTO import_jobs (pageId, sinceDate, status) VALUES (?, ?, ?)").run(pageId, since, status).lastInsertRowid));
     }
   })();
   kickImportWorker();
@@ -452,34 +454,15 @@ async function importDocument(docId: number): Promise<void> {
     const result = await askClaude<Extracted>({ system: SYSTEM, schema: EXTRACT_SCHEMA, content: blocks, maxTokens: 32000 });
     logUsage("import", doc.jobId, result);
 
-    const trackedIds = new Set(tracked.map((t) => t.id));
     const published = doc.publishedDate ?? validDate(result.data.publishedDate);
-    const keep = result.data.entries.filter((e) => e.relevance !== "none");
     db.transaction(() => {
-      const insert = db.prepare(
-        `INSERT INTO history_entries
-           (payerId, importDocId, sourceUrl, sourceTitle, publishedDate, policyName, policyNumber, changeType,
-            effectiveDate, summary, relevance, policyId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
-      const logChange = db.prepare("INSERT INTO policy_changes (policyId, changeDate, summary, sourceUrl) VALUES (?, ?, ?, ?)");
-      const exists = db.prepare("SELECT 1 FROM policy_changes WHERE policyId = ? AND sourceUrl = ? AND summary = ?");
-      for (const e of keep) {
-        const policyId = e.trackedPolicyId !== null && trackedIds.has(e.trackedPolicyId) ? e.trackedPolicyId : null;
-        const type = (CHANGE_TYPES as readonly string[]).includes(e.changeType) ? e.changeType : "other";
-        const effective = validDate(e.effectiveDate);
-        insert.run(doc.payerId, doc.id, doc.url, doc.title, published, e.policyName.slice(0, 300), e.policyNumber, type, effective, e.summary, e.relevance, policyId);
-        if (policyId) {
-          const summary = `${TYPE_LABELS[type as ChangeType]} (from ${doc.title}): ${e.summary}`;
-          if (!exists.get(policyId, doc.url, summary)) logChange.run(policyId, effective ?? published ?? today(), summary, doc.url);
-        }
-      }
+      const kept = saveEntries(doc.payerId, { importDocId: doc.id, url: doc.url, title: doc.title, published }, result.data.entries);
       db.prepare("UPDATE import_docs SET status = 'done', entries = ?, publishedDate = ?, processedAt = datetime('now') WHERE id = ?").run(
-        keep.length,
+        kept,
         published,
         doc.id
       );
-      db.prepare("UPDATE import_jobs SET docsDone = docsDone + 1, entriesFound = entriesFound + ? WHERE id = ?").run(keep.length, doc.jobId);
+      db.prepare("UPDATE import_jobs SET docsDone = docsDone + 1, entriesFound = entriesFound + ? WHERE id = ?").run(kept, doc.jobId);
     })();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Couldn't import the document.";
@@ -488,6 +471,44 @@ async function importDocument(docId: number): Promise<void> {
     if (err instanceof AiError && isAccountError(message)) failJob(doc.jobId, message);
   }
   finishIfComplete(doc.jobId);
+}
+
+export type ExtractedEntry = Extracted["entries"][number];
+
+/**
+ * Store a document's extracted policy changes (dropping "none" relevance) and add
+ * those matching a tracked policy of this payer to its change history. Returns how
+ * many were kept. Call inside a transaction.
+ */
+export function saveEntries(
+  payerId: number,
+  doc: { importDocId: number | null; url: string; title: string; published: string | null },
+  entries: ExtractedEntry[]
+): number {
+  const db = getDb();
+  const trackedIds = new Set(
+    (db.prepare("SELECT id FROM policies WHERE payerId = ?").all(payerId) as { id: number }[]).map((r) => r.id)
+  );
+  const insert = db.prepare(
+    `INSERT INTO history_entries
+       (payerId, importDocId, sourceUrl, sourceTitle, publishedDate, policyName, policyNumber, changeType,
+        effectiveDate, summary, relevance, policyId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const logChange = db.prepare("INSERT INTO policy_changes (policyId, changeDate, summary, sourceUrl) VALUES (?, ?, ?, ?)");
+  const exists = db.prepare("SELECT 1 FROM policy_changes WHERE policyId = ? AND sourceUrl = ? AND summary = ?");
+  const keep = entries.filter((e) => e.relevance !== "none");
+  for (const e of keep) {
+    const policyId = e.trackedPolicyId !== null && trackedIds.has(e.trackedPolicyId) ? e.trackedPolicyId : null;
+    const type = (CHANGE_TYPES as readonly string[]).includes(e.changeType) ? e.changeType : "other";
+    const effective = validDate(e.effectiveDate);
+    insert.run(payerId, doc.importDocId, doc.url, doc.title, doc.published, e.policyName.slice(0, 300), e.policyNumber, type, effective, e.summary, e.relevance, policyId);
+    if (policyId) {
+      const summary = `${TYPE_LABELS[type as ChangeType]} (from ${doc.title}): ${e.summary}`;
+      if (!exists.get(policyId, doc.url, summary)) logChange.run(policyId, effective ?? doc.published ?? today(), summary, doc.url);
+    }
+  }
+  return keep.length;
 }
 
 function finishIfComplete(jobId: number) {

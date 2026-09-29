@@ -11,6 +11,7 @@ const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/history", label: "History", icon: ClockIcon },
   { href: "/payers", label: "Payers", icon: BuildingIcon },
   { href: "/watch", label: "Watch list", icon: RadarIcon },
+  { href: "/cowork", label: "Cowork tasks", icon: SparkIcon },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -168,6 +169,15 @@ function RadarIcon() {
       <circle cx="12" cy="12" r="8.5" />
       <circle cx="12" cy="12" r="4.5" />
       <path d="M12 12l6-6" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9L12 3.5z" />
+      <path d="M18.5 16v4M16.5 18h4" />
     </svg>
   );
 }

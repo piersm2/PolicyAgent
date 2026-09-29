@@ -182,11 +182,43 @@ check; **Write brief now** and **Summarize now** do it on demand.
 - Summaries are AI-written. Check the document before acting on anything that affects
   payment.
 
+## Daily Cowork task (no API key needed)
+
+Without an Anthropic API key, a daily Claude Cowork task can do the reading instead,
+using your Claude subscription. The **Cowork tasks** page (`/cowork`) lists the day's
+work: policy briefs to write, website changes to summarize, and history imports queued
+on the History page, with instructions and the exact result format. Cowork reads each
+document, pastes its results into the page, and clicks **Save results**. Results are
+stored exactly as if the app had called Claude: briefs on policy pages, summaries on
+website changes, and imported history with matches added to tracked policies. The page
+limits each day's work (5 briefs, 10 summaries, 10 bulletins), and the same list is at
+`GET /api/cowork`.
+
+Create a scheduled task in Cowork (daily, for example 7:30 AM) with this prompt, using
+your codespace's name and address:
+
+```
+Daily Payer Policy Watch reading. Use Chrome, where I'm signed in to GitHub.
+1. Open https://github.com/codespaces. If the codespace "<codespace-name>" isn't running,
+   open it in the browser and wait until its terminal shows "Ready" (up to 3 minutes).
+   Leave that tab open.
+2. Open https://<codespace-name>-3000.app.github.dev/cowork. If GitHub shows a
+   "Continue" page, click Continue. If the page doesn't load, wait a minute and retry,
+   up to 5 times.
+3. Follow the instructions on that page: do the tasks up to the limits shown, paste the
+   results JSON into the Results box, and click Save results. Fix and re-save anything
+   it lists as an error.
+4. Reply with a short summary: briefs written, changes summarized, bulletins imported,
+   and anything you couldn't open.
+```
+
 ## Importing past bulletins
 
 The **History** page pulls policy changes out of payers' past bulletins and notices
 (for example UHC's monthly policy update bulletins, CMS transmittals, Aetna OfficeLink,
-Home State Health notices). It needs the Anthropic API key.
+Home State Health notices). With an Anthropic API key the app does the import itself,
+as below. Without one, **Queue for Cowork** hands it to the daily Cowork task, which
+reads up to 10 bulletins a day.
 
 1. Tick the watched listing pages to import from, pick the period (12 months by
    default), and click **Find past bulletins**. Claude reads each page, and up to three
@@ -275,6 +307,8 @@ All routes return JSON and validate input.
 | `POST /api/history/jobs/:id`                 | `{"action": "start" \| "cancel" \| "retry"}`             |
 | `POST /api/history/start-all`                | Start every import that has found its documents          |
 | `POST /api/history/entries/:id/track`        | Start tracking the policy an imported change is about    |
+| `GET /api/cowork`                            | The day's reading tasks for Cowork, with the result format |
+| `POST /api/cowork/results`                   | Save Cowork's briefs, summaries, and imported bulletins  |
 
 Payer `pages` are extra policy pages to watch: an array or newline-separated text, each
 `https://…` or `Label | https://…`.
@@ -311,6 +345,7 @@ lib/
   ai.ts                 Claude API client (structured replies, errors, cost estimate)
   summaries.ts          Policy briefs, change summaries, background queue
   history.ts            Historical import: find past bulletins, extract changes, queue
+  cowork.ts             Daily task list for Cowork and saving its results
   origin.ts             Public address for feed links
   format.ts             Dates and times in the configured time zone
   board.ts, priority.ts "Needs attention" ranking and action items

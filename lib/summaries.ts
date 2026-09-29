@@ -9,7 +9,7 @@ import type { BriefState, ChangeSummary, PageLink, PolicyBrief } from "./types";
 // background after page checks (processPendingSummaries) or on demand from the
 // policy page and the website-changes list.
 
-const ORGANIZATION_PROFILE =
+export const ORGANIZATION_PROFILE =
   process.env.ORGANIZATION_PROFILE ||
   "a rural hospital in Missouri (inpatient, outpatient, emergency department, and clinic services) " +
     "whose payers include traditional Medicare, MO HealthNet (Missouri Medicaid) and its managed care plans, " +
