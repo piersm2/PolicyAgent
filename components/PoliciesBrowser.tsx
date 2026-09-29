@@ -93,7 +93,7 @@ export function PoliciesBrowser({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Policies</h1>
+          <h1 className="page-title">Policies</h1>
           <p className="text-sm text-slate-500">
             {loading ? "Loading…" : `${policies.length} ${policies.length === 1 ? "policy" : "policies"}`}
             {activeFilterCount > 0 && !loading ? " (filtered)" : ""}

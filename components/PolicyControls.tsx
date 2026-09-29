@@ -89,7 +89,7 @@ export function ActionCard({ policy, payers }: { policy: PolicyWithPayer; payers
   return (
     <div className="card p-6">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-900">Follow-up</h2>
+        <h2 className="text-lg font-bold text-slate-900">Follow-up</h2>
         {policy.nextAction ? (
           <button className="btn-ghost text-sm" onClick={done} disabled={busy}>
             {busy ? "Saving…" : "Done"}

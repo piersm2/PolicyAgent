@@ -62,7 +62,7 @@ export function WatchManager({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Watch list</h1>
+          <h1 className="page-title">Watch list</h1>
           <p className="text-sm text-slate-500">
             Payer pages and policy documents checked for changes every {checkEveryHours} hours while the app is
             running. In a codespace, the “Scheduled payer check” GitHub Action wakes it daily (see the README).
