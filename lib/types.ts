@@ -90,6 +90,8 @@ export interface PolicyChange {
   policyId: number;
   changeDate: string; // ISO date
   summary: string;
+  /** Bulletin the change was imported from (historical import). */
+  sourceUrl: string | null;
   createdAt: string;
 }
 

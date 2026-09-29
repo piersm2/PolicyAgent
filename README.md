@@ -52,6 +52,8 @@ database, use **Payers → Add from catalog**.
   next review date forward by the policy's review interval), **Open document**, the
   follow-up (owner, next action, due date, with **Done**), the document's watch status
   and any changes found in it, and the change history.
+- **History:** policy changes imported from payers' past bulletins, month by month,
+  and the import queue (see **Importing past bulletins**).
 - **Payers:** the payers you track. **Add from catalog** adds known payers with their
   policy pages; **Add payer** takes the payer's policy page addresses, one per line.
 - **Watch list:** the payer pages and policy documents being checked, with each one's
@@ -180,6 +182,32 @@ check; **Write brief now** and **Summarize now** do it on demand.
 - Summaries are AI-written. Check the document before acting on anything that affects
   payment.
 
+## Importing past bulletins
+
+The **History** page pulls policy changes out of payers' past bulletins and notices
+(for example UHC's monthly policy update bulletins, CMS transmittals, Aetna OfficeLink,
+Home State Health notices). It needs the Anthropic API key.
+
+1. Tick the watched listing pages to import from, pick the period (12 months by
+   default), and click **Find past bulletins**. Claude reads each page, and up to three
+   of its archive pages, and picks out the documents published in that period.
+2. Each page shows how many documents it found and the estimated cost. Click **Start
+   import** (or **Start all**).
+3. Documents are read one at a time in the background. Claude lists each policy change
+   in them: policy, type (new, revised, retired, reimbursement, prior authorization,
+   coverage, coding), effective date, summary, and relevance. Changes rated not
+   relevant are dropped.
+4. Changes that match a policy you track are added to its change history with a link to
+   the bulletin. **Track** starts tracking any other policy in the list.
+
+The queue survives restarts: an interrupted import continues when the app starts again,
+and the daily scheduled check works through `IMPORT_PER_RUN` documents when the app
+is closed. **Cancel**, **Resume**, and **Retry failed** are on each import. A document
+already imported for a payer isn't read again. Estimates assume about 30,000 tokens per
+document (about $0.18 on Claude Opus 5.5); long monthly bulletins cost more, which the
+"up to" figure allows for. Twelve months of UHC's three monthly bulletins is about 36
+documents.
+
 ## Connecting Cowork
 
 With the app running, point Cowork at:
@@ -189,8 +217,8 @@ With the app running, point Cowork at:
 - **`/api/feed`:** the same feed as JSON.
 
 The feed contains website changes to review (with what changed), action items, the
-ranked needs-attention list with reasons, recent logged changes, watch-list status
-(including errors), and every policy. Timestamps in the JSON are UTC (ISO 8601); the
+ranked needs-attention list with reasons, recent logged changes, imported bulletin
+history from the last 90 days, watch-list status (including errors), and every policy. Timestamps in the JSON are UTC (ISO 8601); the
 text version shows them in Central time.
 
 Links in the feed use the address the feed was requested from. In a codespace they
@@ -215,6 +243,7 @@ action.
 | `AI_MODEL`             | `claude-opus-5-5` | Claude model for briefs and summaries                     |
 | `AI_EFFORT`            | `medium`          | `low` to `max`; higher is more thorough and costs more    |
 | `AI_MAX_PER_RUN`       | `10`              | Most briefs/summaries written after one check run         |
+| `IMPORT_PER_RUN`       | `20`              | Import steps the scheduled check runs when the app is closed |
 | `ORGANIZATION_PROFILE` | rural Missouri hospital | Who "us" is in briefs, e.g. services and main payers |
 
 Times are stored in UTC and always displayed in the configured time zone, whatever
@@ -241,6 +270,11 @@ All routes return JSON and validate input.
 | `POST /api/policies/:id/action-done`         | Clear the next action and its due date                   |
 | `GET/POST /api/policies/:id/brief`           | Read the policy brief / write or refresh it now          |
 | `GET/POST /api/policies/:id/changes`         | List / log a change (`changeDate`, `summary`)            |
+| `GET /api/history`                           | Imported changes (`payerId`, `relevance`=high/medium/all, `q`, `since`, `limit`) |
+| `GET/POST /api/history/jobs`                 | List imports / queue one per page (`{"pageIds":[..],"months":12}`) |
+| `POST /api/history/jobs/:id`                 | `{"action": "start" \| "cancel" \| "retry"}`             |
+| `POST /api/history/start-all`                | Start every import that has found its documents          |
+| `POST /api/history/entries/:id/track`        | Start tracking the policy an imported change is about    |
 
 Payer `pages` are extra policy pages to watch: an array or newline-separated text, each
 `https://…` or `Label | https://…`.
@@ -276,6 +310,7 @@ lib/
   feed.ts               The compiled feed (JSON and text)
   ai.ts                 Claude API client (structured replies, errors, cost estimate)
   summaries.ts          Policy briefs, change summaries, background queue
+  history.ts            Historical import: find past bulletins, extract changes, queue
   origin.ts             Public address for feed links
   format.ts             Dates and times in the configured time zone
   board.ts, priority.ts "Needs attention" ranking and action items
