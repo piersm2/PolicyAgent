@@ -1,8 +1,8 @@
 @echo off
-rem Double-click to run PolicyAgent on this computer. Keep this window open while you use it.
+rem Double-click to run Payer Policy Watch on this computer. Keep this window open while you use it.
 cd /d "%~dp0"
 
-where node >/dev/null 2>nul
+where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js is not installed. Install the LTS version from https://nodejs.org, then run this again.
   pause
@@ -18,11 +18,11 @@ call npm run build
 if errorlevel 1 goto failed
 
 echo.
-echo PolicyAgent is running at http://localhost:3000
+echo Payer Policy Watch is running at http://localhost:3000
 echo Cowork feed: http://localhost:3000/api/feed?format=md
 echo Close this window to stop the app.
 echo.
-start "" cmd /c "timeout /t 5 >/dev/null & start http://localhost:3000"
+start "" cmd /c "timeout /t 5 >nul & start http://localhost:3000"
 call npm start
 goto :eof
 

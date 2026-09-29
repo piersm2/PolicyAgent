@@ -77,7 +77,7 @@ const MD_LIST_LIMIT = 15;
 export function feedToMarkdown(feed: Feed, origin: string): string {
   const out: string[] = [];
   const c = feed.counts;
-  out.push(`# PolicyAgent feed`);
+  out.push(`# Payer Policy Watch feed`);
   out.push(`Generated ${formatDateTime(feed.generatedAt)}. Payer pages are checked every ${feed.checkEveryHours} hours while the app runs.`);
   out.push(
     `${c.policies} policies · ${c.upcoming} upcoming · ${c.highImpact} high impact · ${c.payers} payers · ` +
