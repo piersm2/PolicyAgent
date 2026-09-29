@@ -6,7 +6,10 @@ import { CategoryBadge, ImpactBadge, StatusBadge } from "@/components/Badges";
 import { AddChange } from "@/components/AddChange";
 import { ActionCard, PolicyHeaderActions } from "@/components/PolicyControls";
 import { WebsiteChanges } from "@/components/WebsiteChanges";
-import { daysFromToday, formatDate, formatDateTime, relativeDays } from "@/lib/format";
+import { PolicyBriefCard } from "@/components/PolicyBrief";
+import { getBriefState } from "@/lib/summaries";
+import { aiEnabled } from "@/lib/ai";
+import { daysFromToday, formatDate, formatDateTime, relativeDays, safeHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <div className="label">{label}</div>
       <div className="text-sm text-slate-800">{children}</div>
     </div>
+  );
+}
+
+function DocumentLink({ url }: { url: string }) {
+  const href = safeHref(url);
+  if (!href) return <span className="break-all text-slate-500">{url}</span>;
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="break-all font-medium text-brand-600 hover:text-brand-700 hover:underline">
+      {url} ↗
+    </a>
   );
 }
 
@@ -82,6 +95,8 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
         </div>
       </div>
 
+      <PolicyBriefCard policyId={policy.id} state={getBriefState(policy.id)} policyEffectiveDate={policy.effectiveDate} />
+
       <ActionCard policy={policy} payers={listPayers()} />
 
       {/* The policy's own document */}
@@ -91,13 +106,15 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
           <p className="mt-1 text-sm text-slate-400">No document link. Edit the policy to add one and watch it.</p>
         ) : !watch ? (
           <p className="mt-1 text-sm text-slate-500">
-            <span className="break-all">{policy.sourceUrl}</span>
+            <DocumentLink url={policy.sourceUrl} />
             <br />
             Not watched. Edit the policy and tick “Watch this document for changes”.
           </p>
         ) : (
           <div className="mt-1 text-sm">
-            <p className="break-all text-slate-500">{watch.url}</p>
+            <p>
+              <DocumentLink url={watch.url} />
+            </p>
             {watch.lastError ? (
               <p className="text-red-600">Last check failed: {watch.lastError}</p>
             ) : watch.lastSuccessAt ? (
@@ -115,6 +132,7 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
       {documentChanges.length > 0 && (
         <WebsiteChanges
           changes={documentChanges}
+          aiOn={aiEnabled()}
           title="Document changes to review"
           subtitle="Differences found in this policy's document since it was last reviewed."
         />

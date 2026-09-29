@@ -4,21 +4,31 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiSend } from "@/lib/client";
 import { formatDateTime, safeHref } from "@/lib/format";
-import type { PageChange, PageLink } from "@/lib/types";
+import type { ChangeSummary, PageChange, PageLink, Relevance } from "@/lib/types";
 
 const SHOW = 10;
 
+const RELEVANCE: Record<Relevance, { label: string; style: string }> = {
+  high: { label: "High relevance", style: "bg-rose-600 text-white" },
+  medium: { label: "Medium", style: "bg-amber-100 text-amber-800" },
+  low: { label: "Low", style: "bg-slate-100 text-slate-600" },
+  none: { label: "Not relevant", style: "bg-slate-100 text-slate-500" },
+};
+
 export function WebsiteChanges({
   changes,
+  aiOn = false,
   title = "Website changes to review",
   subtitle = "Found on watched payer pages since your last review.",
 }: {
   changes: PageChange[];
+  aiOn?: boolean;
   title?: string;
   subtitle?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<number | null>(null);
+  const [summarizing, setSummarizing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function markReviewed(id: number) {
@@ -31,6 +41,19 @@ export function WebsiteChanges({
       setError(err instanceof Error ? err.message : "Couldn't mark reviewed");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function requestSummary(id: number) {
+    setSummarizing(id);
+    setError(null);
+    try {
+      await apiSend(`/api/website-changes/${id}/summarize`, "POST");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't summarize");
+    } finally {
+      setSummarizing(null);
     }
   }
 
@@ -63,6 +86,26 @@ export function WebsiteChanges({
                 {busy === c.id ? "Saving…" : "Mark reviewed"}
               </button>
             </div>
+            {c.aiSummary ? (
+              <AiSummary summary={c.aiSummary} />
+            ) : summarizing === c.id ? (
+              <p className="mt-2 text-sm text-brand-700">Claude is reading the change…</p>
+            ) : aiOn ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {c.aiError ? (
+                  <span className="text-rose-600">Couldn&apos;t summarize: {c.aiError}</span>
+                ) : (
+                  <span className="text-slate-400">Summary on its way.</span>
+                )}
+                <button
+                  className="font-semibold text-brand-600 hover:text-brand-700"
+                  onClick={() => requestSummary(c.id)}
+                  disabled={summarizing !== null}
+                >
+                  {c.aiError ? "Try again" : "Summarize now"}
+                </button>
+              </div>
+            ) : null}
             <details className="mt-2 text-sm">
               <summary className="cursor-pointer text-xs font-medium text-brand-600">Show details</summary>
               <div className="mt-2 space-y-2">
@@ -82,6 +125,27 @@ export function WebsiteChanges({
         ))}
       </ul>
     </section>
+  );
+}
+
+function AiSummary({ summary }: { summary: ChangeSummary }) {
+  const rel = RELEVANCE[summary.relevance] ?? RELEVANCE.low;
+  return (
+    <div className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`badge ${rel.style}`}>{rel.label}</span>
+        <span className="font-bold text-slate-900">{summary.headline}</span>
+      </div>
+      <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{summary.whatChanged}</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+        <span className="font-semibold text-slate-800">Why it matters: </span>
+        {summary.whyItMatters}
+      </p>
+      {summary.suggestedAction && (
+        <p className="mt-1.5 text-sm font-medium leading-relaxed text-brand-700">→ {summary.suggestedAction}</p>
+      )}
+      <p className="mt-2 text-[11px] text-slate-400">Summary by Claude</p>
+    </div>
   );
 }
 

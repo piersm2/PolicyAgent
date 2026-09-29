@@ -42,6 +42,10 @@ function initSchema(db: Database.Database) {
       owner          TEXT,
       nextAction     TEXT,
       actionDue      TEXT,           -- date
+      brief          TEXT,           -- JSON PolicyBrief written by Claude from the document
+      briefAt        TEXT,
+      briefHash      TEXT,           -- document snapshot hash the brief was written from
+      briefError     TEXT,
       createdAt      TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt      TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -82,7 +86,21 @@ function initSchema(db: Database.Database) {
       addedText    TEXT NOT NULL DEFAULT '[]',  -- JSON string[]
       removedText  TEXT NOT NULL DEFAULT '[]',
       fileChanged  INTEGER NOT NULL DEFAULT 0,  -- non-HTML document changed
-      reviewedAt   TEXT
+      reviewedAt   TEXT,
+      aiSummary    TEXT,                        -- JSON ChangeSummary written by Claude
+      aiSummaryAt  TEXT,
+      aiError      TEXT
+    );
+
+    -- Claude API calls, for the usage/cost line.
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind         TEXT NOT NULL,               -- 'brief' | 'change'
+      refId        INTEGER NOT NULL,
+      model        TEXT NOT NULL,
+      inputTokens  INTEGER NOT NULL,
+      outputTokens INTEGER NOT NULL,
+      createdAt    TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_watch_payer ON watch_pages(payerId);
@@ -90,7 +108,7 @@ function initSchema(db: Database.Database) {
   `);
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // Fields removed when the app was simplified. Databases created by earlier
 // versions still have these columns; drop them so the current inserts work
@@ -124,8 +142,17 @@ const ADDED_COLUMNS: Record<string, [name: string, definition: string][]> = {
     ["owner", "TEXT"],
     ["nextAction", "TEXT"],
     ["actionDue", "TEXT"],
+    ["brief", "TEXT"],
+    ["briefAt", "TEXT"],
+    ["briefHash", "TEXT"],
+    ["briefError", "TEXT"],
   ],
   watch_pages: [["policyId", "INTEGER REFERENCES policies(id) ON DELETE CASCADE"]],
+  page_changes: [
+    ["aiSummary", "TEXT"],
+    ["aiSummaryAt", "TEXT"],
+    ["aiError", "TEXT"],
+  ],
 };
 
 function addNewColumns(db: Database.Database) {
@@ -182,7 +209,7 @@ export function getDb(): Database.Database {
   const db = new Database(DB_PATH);
   initSchema(db);
 
-  // user_version: 0 = brand-new file, 1-2 = earlier app versions, 3 = current.
+  // user_version: 0 = brand-new file, 1-3 = earlier app versions, 4 = current.
   const version = db.pragma("user_version", { simple: true }) as number;
   if (version < SCHEMA_VERSION) {
     dropLegacyColumns(db);

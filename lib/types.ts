@@ -120,6 +120,41 @@ export interface WatchPage {
   createdAt: string;
 }
 
+/** Plain-language brief of a policy, written by Claude from the policy document. */
+export interface PolicyBrief {
+  inShort: string;
+  keyRequirements: string[];
+  servicesAndCodes: string[];
+  whatItMeansForUs: string;
+  whatChanged: string | null;
+  /** Effective date stated in the document (YYYY-MM-DD). */
+  effectiveDate: string | null;
+  /** Version/revision label shown on the document. */
+  documentVersion: string | null;
+  /** Set by the app when only part of a long document could be read. */
+  partial?: string | null;
+}
+
+export type BriefStatus = "ready" | "stale" | "pending" | "error" | "no-document" | "disabled";
+
+export interface BriefState {
+  status: BriefStatus;
+  brief: PolicyBrief | null;
+  briefAt: string | null;
+  error: string | null;
+}
+
+export type Relevance = "high" | "medium" | "low" | "none";
+
+/** Plain-English explanation of a detected website/document change, written by Claude. */
+export interface ChangeSummary {
+  headline: string;
+  whatChanged: string;
+  whyItMatters: string;
+  suggestedAction: string | null;
+  relevance: Relevance;
+}
+
 /** What differed on a watched page between two checks. */
 export interface PageChange {
   id: number;
@@ -136,4 +171,7 @@ export interface PageChange {
   removedText: string[];
   fileChanged: boolean;
   reviewedAt: string | null;
+  aiSummary: ChangeSummary | null;
+  aiSummaryAt: string | null;
+  aiError: string | null;
 }

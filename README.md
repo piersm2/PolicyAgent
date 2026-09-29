@@ -8,6 +8,8 @@ tool) can read:
   links, and text added or removed.
 - **Your policies:** the policies you track, with review dates, an owner, and the
   next action, ranked by what needs attention first.
+- **Plain-language summaries (optional):** Claude reads each policy document and writes
+  a brief, and explains each detected change and why it matters.
 - **One feed:** everything compiled at `http://localhost:3000/api/feed`.
 
 > Sample data is illustrative, not a substitute for each payer's official policy
@@ -46,7 +48,7 @@ database, use **Payers → Add from catalog**.
   links to its policy. **Open feed** shows the compiled feed.
 - **Policies:** search and filter; add, edit, delete. The table shows each policy's
   next action.
-- **Policy page:** **Edit**, **Mark reviewed** (records today's review and moves the
+- **Policy page:** the **policy brief** (see below), **Edit**, **Mark reviewed** (records today's review and moves the
   next review date forward by the policy's review interval), **Open document**, the
   follow-up (owner, next action, due date, with **Done**), the document's watch status
   and any changes found in it, and the change history.
@@ -82,10 +84,18 @@ set the `CHECK_EVERY_HOURS` environment variable to change that. You can also cl
   parameters (`t`, `ts`, `_`, `cb`, `nocache`, `timestamp`, and similar) are removed,
   so a link whose only difference is `?t=1695600000` isn't reported as new. `v` is
   kept because some payers (Healthy Blue) use `?v=` for the document's version.
-- **For PDFs and other files** it reports that the document changed.
+- **For PDFs and Word (.docx) files** it compares the document's text, so a change shows
+  the lines added and removed. **Other files** are reported as changed.
+- **Document landing pages** (like MO HealthNet's manual pages, which only link to the
+  current .docx) are followed to the document, and its text is compared. A new version
+  with a new file name also shows up as a new link.
+- **Pages built by JavaScript:** when a page comes back nearly empty, the app loads it
+  in a headless browser (Chromium) and reads it after its scripts run. The codespace
+  and the Windows launcher install the browser; otherwise run `npm run install-browser`
+  once. A page that's still nearly empty probably needs a login.
 - **Pages that can't be checked** show why on the Watch list and in the feed. Some
-  payer sites block automated requests; others build their content with JavaScript or
-  require a login. Those need a person, or Cowork in a browser, to review.
+  payer sites block automated requests or require a login. Those need a person, or
+  Cowork in a browser, to review.
 
 Each detected change stays in **Website changes to review** until it's marked reviewed.
 
@@ -96,10 +106,11 @@ from GitHub's network by the **Verify payer links** workflow when the catalog ch
 and every Monday; a failed run means a payer moved a page. Run the same check
 yourself with `npm run check-links`.
 
-Some payer pages can't be watched because they load their lists with JavaScript:
-WPS (Missouri's Medicare contractor), the Medicare Coverage Database reports, Anthem
-Provider News, Healthy Blue's policy search and news, and Humana's claims payment
-policies. The catalog notes these; watch individual policy documents instead.
+Some payer pages load their lists with JavaScript: WPS (Missouri's Medicare
+contractor), the Medicare Coverage Database reports, Anthem Provider News, Healthy
+Blue's policy search and news, and Humana's claims payment policies. With the page
+reader installed you can add them on the Watch list, but they aren't in the catalog
+because they haven't been verified yet.
 
 ### Scheduled checks
 
@@ -125,6 +136,49 @@ The built-in timer only runs while the app is running. A codespace stops after a
 
    Until `CODESPACE_NAME` is set, the workflow skips itself. A codespace that isn't used
    for 30 days is deleted by GitHub, along with its database.
+
+## AI briefs and summaries
+
+With an Anthropic API key, the app uses Claude (Claude Opus 5.5 by default) to write:
+
+- **A brief on each policy page:** in short, key requirements, services and codes,
+  what it means for us, what changed in the latest version, and the effective date and
+  version the document states. It's written after the policy document's first check,
+  rewritten whenever the document changes, and can be refreshed any time.
+- **A summary of each detected change:** a headline, what changed, why it matters, a
+  suggested next step, and a relevance rating. When a page adds a link to a new
+  bulletin or policy, Claude reads the new document too.
+
+Both appear in the app and in the feed. Summaries run in the background after each
+check; **Write brief now** and **Summarize now** do it on demand.
+
+### Turn it on
+
+1. Create an API key at https://console.anthropic.com (**API keys**), and add credits
+   under **Billing**.
+2. Give the app the key:
+   - **Codespaces:** at https://github.com/settings/codespaces, under **Codespaces
+     secrets**, click **New secret**. Name it `ANTHROPIC_API_KEY`, paste the key, and
+     give it access to this repository. Then stop and restart the codespace.
+   - **On your computer:** create a file named `.env.local` in the app folder containing
+     `ANTHROPIC_API_KEY=sk-ant-...` and restart the app.
+3. On the Watch list, click **Check all now**. Briefs and summaries appear over the next
+   few minutes.
+
+### Cost and data
+
+- Claude Opus 5.5 costs $4 per million input tokens and $20 per million output tokens.
+  A brief of a typical 10-30 page policy uses roughly 10,000-40,000 input tokens, about
+  $0.05-0.25; a change summary usually costs a few cents. Very long documents are read up
+  to about 100,000 tokens (roughly $0.50 per brief), and the brief says so. The Watch list
+  shows this month's count and estimated cost.
+- At most 10 summaries are written per check run (`AI_MAX_PER_RUN`). A failed document
+  isn't retried until it changes or you click **Try again**.
+- `AI_MODEL=claude-sonnet-5-5` halves the price; quality on dense policies may drop.
+- What's sent: the payer document or page text, the policy's title, payer, category, and
+  **notes**. Keep patient information out of policy notes. Nothing else leaves the app.
+- Summaries are AI-written. Check the document before acting on anything that affects
+  payment.
 
 ## Connecting Cowork
 
@@ -155,6 +209,13 @@ action.
 | `CHECK_EVERY_HOURS`    | `24`              | How old a page's last check must be before it's due      |
 | `BASE_URL`             | (request address) | Address used for links in the feed                        |
 | `PORT`                 | `3000`            | Port the app listens on                                   |
+| `RENDER_JS_PAGES`      | `1`               | `0` turns off loading nearly empty pages in a browser     |
+| `CHROMIUM_PATH`        | (installed one)   | Use a specific Chrome/Chromium for the page reader        |
+| `ANTHROPIC_API_KEY`    | (none)            | Turns on AI briefs and change summaries                   |
+| `AI_MODEL`             | `claude-opus-5-5` | Claude model for briefs and summaries                     |
+| `AI_EFFORT`            | `medium`          | `low` to `max`; higher is more thorough and costs more    |
+| `AI_MAX_PER_RUN`       | `10`              | Most briefs/summaries written after one check run         |
+| `ORGANIZATION_PROFILE` | rural Missouri hospital | Who "us" is in briefs, e.g. services and main payers |
 
 Times are stored in UTC and always displayed in the configured time zone, whatever
 the viewer's computer is set to.
@@ -170,6 +231,7 @@ All routes return JSON and validate input.
 | `DELETE /api/watch/:id`                      | Stop watching a page (removes its detected changes)      |
 | `POST /api/watch/check`                      | Check all pages now; `{"pageId": n}` for one; `{"due": true}` for due pages only |
 | `POST /api/website-changes/:id/review`       | Mark a detected website change reviewed                  |
+| `POST /api/website-changes/:id/summarize`    | Have Claude summarize a detected change now              |
 | `GET/POST /api/catalog`                      | List catalog payers / add them (`{"keys": [...]}`)       |
 | `GET/POST /api/payers`                       | List / create payers (`name`, `type`, `website`, `pages`) |
 | `GET/PUT/DELETE /api/payers/:id`             | Read / update / delete a payer                           |
@@ -177,6 +239,7 @@ All routes return JSON and validate input.
 | `GET/PUT/DELETE /api/policies/:id`           | Read / update / delete                                   |
 | `POST /api/policies/:id/review`              | Mark reviewed: next review = today + review interval     |
 | `POST /api/policies/:id/action-done`         | Clear the next action and its due date                   |
+| `GET/POST /api/policies/:id/brief`           | Read the policy brief / write or refresh it now          |
 | `GET/POST /api/policies/:id/changes`         | List / log a change (`changeDate`, `summary`)            |
 
 Payer `pages` are extra policy pages to watch: an array or newline-separated text, each
@@ -208,8 +271,11 @@ lib/
   catalog-install.ts    Adds catalog payers and pages to the database
   repo.ts               Policies, payers, logged changes, reviews, actions
   watch.ts              Watch list, page checks, change detection, schedule
-  extract.ts            Fetches a page, reduces it to links + text, normalizes URLs
+  extract.ts            Fetches pages, PDFs, and Word files (headless browser for JavaScript
+                        pages), reduces them to links + text, normalizes URLs
   feed.ts               The compiled feed (JSON and text)
+  ai.ts                 Claude API client (structured replies, errors, cost estimate)
+  summaries.ts          Policy briefs, change summaries, background queue
   origin.ts             Public address for feed links
   format.ts             Dates and times in the configured time zone
   board.ts, priority.ts "Needs attention" ranking and action items
