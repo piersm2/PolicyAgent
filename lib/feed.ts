@@ -1,7 +1,8 @@
 import { getBoard } from "./board";
 import { listPolicies } from "./repo";
 import { checkEveryHours, listPageChanges, listWatchPages } from "./watch";
-import { TIME_ZONE, formatDateTime, isoUtc } from "./format";
+import { TIME_ZONE, addDays, formatDateTime, isoUtc, today } from "./format";
+import { TYPE_LABELS, listHistory } from "./history";
 import { getBriefState } from "./summaries";
 
 // The compiled feed Cowork (or any tool) reads: website changes waiting for
@@ -38,6 +39,11 @@ export function compileFeed(origin: string) {
     })),
     needsAttention: board.needsAttention.map((p) => ({ ...p, url: `${origin}/policies/${p.id}` })),
     recentChanges: board.recentChanges,
+    // Policy changes imported from payers' past bulletins (last 90 days, high and medium relevance).
+    history: listHistory({ relevance: "medium", sinceDate: addDays(today(), -90), limit: 100 }).map((h) => ({
+      ...h,
+      policyUrl: h.policyId ? `${origin}/policies/${h.policyId}` : null,
+    })),
     watchList: watchList.map((p) => ({
       id: p.id,
       payer: p.payerName,
@@ -132,6 +138,18 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
   if (!feed.recentChanges.length) out.push("None.");
   for (const r of feed.recentChanges) out.push(`- ${r.changeDate} · ${r.payerName} — ${r.policyTitle}: ${r.summary}`);
 
+  out.push(`\n## Payer bulletin history (last 90 days, high & medium relevance)`);
+  if (!feed.history.length) out.push("None imported yet.");
+  for (const h of feed.history.slice(0, 40)) {
+    out.push(
+      `- ${h.publishedDate ?? "undated"} · ${h.payerName} · **${h.policyName}**${h.policyNumber ? ` (${h.policyNumber})` : ""}` +
+        ` — ${TYPE_LABELS[h.changeType] ?? h.changeType}, ${h.relevance} relevance` +
+        `${h.effectiveDate ? `, effective ${h.effectiveDate}` : ""}: ${h.summary} Source: ${h.sourceUrl}` +
+        (h.policyUrl ? ` Tracked: ${h.policyUrl}` : "")
+    );
+  }
+  if (feed.history.length > 40) out.push(`- …and ${feed.history.length - 40} more (see JSON feed or ${origin}/api/history)`);
+
   out.push(`\n## Watch list`);
   if (!feed.watchList.length) out.push("No pages are being watched.");
   for (const w of feed.watchList) {
@@ -169,6 +187,7 @@ export function feedToMarkdown(feed: Feed, origin: string): string {
   out.push(`- Log a change on a policy: POST ${origin}/api/policies/<id>/changes with {"changeDate":"YYYY-MM-DD","summary":"..."}`);
   out.push(`- Add a policy: POST ${origin}/api/policies (see README for fields)`);
   out.push(`- Check watched pages now: POST ${origin}/api/watch/check`);
+  out.push(`- Full imported history: GET ${origin}/api/history?relevance=all&since=YYYY-MM-DD`);
 
   return out.join("\n") + "\n";
 }

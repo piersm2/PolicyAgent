@@ -55,6 +55,7 @@ function initSchema(db: Database.Database) {
       policyId    INTEGER NOT NULL REFERENCES policies(id) ON DELETE CASCADE,
       changeDate  TEXT NOT NULL,
       summary     TEXT NOT NULL,
+      sourceUrl   TEXT,          -- bulletin the change was imported from
       createdAt   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -92,10 +93,60 @@ function initSchema(db: Database.Database) {
       aiError      TEXT
     );
 
+    -- Historical import: one job per watched listing page, the documents it found,
+    -- and the policy changes Claude extracted from them.
+    CREATE TABLE IF NOT EXISTS import_jobs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      pageId        INTEGER NOT NULL REFERENCES watch_pages(id) ON DELETE CASCADE,
+      sinceDate     TEXT NOT NULL,                -- oldest publication date wanted
+      status        TEXT NOT NULL,                -- discovering | ready | queued | running | done | failed | cancelled
+      error         TEXT,
+      docsFound     INTEGER NOT NULL DEFAULT 0,
+      docsDone      INTEGER NOT NULL DEFAULT 0,
+      docsFailed    INTEGER NOT NULL DEFAULT 0,
+      entriesFound  INTEGER NOT NULL DEFAULT 0,
+      estimatedCost REAL,
+      createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
+      finishedAt    TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS import_docs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      jobId         INTEGER NOT NULL REFERENCES import_jobs(id) ON DELETE CASCADE,
+      url           TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      publishedDate TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending', -- pending | done | failed
+      error         TEXT,
+      entries       INTEGER NOT NULL DEFAULT 0,
+      processedAt   TEXT,
+      UNIQUE (jobId, url)
+    );
+
+    CREATE TABLE IF NOT EXISTS history_entries (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      payerId       INTEGER NOT NULL REFERENCES payers(id) ON DELETE CASCADE,
+      importDocId   INTEGER REFERENCES import_docs(id) ON DELETE SET NULL,
+      sourceUrl     TEXT NOT NULL,
+      sourceTitle   TEXT NOT NULL,
+      publishedDate TEXT,
+      policyName    TEXT NOT NULL,
+      policyNumber  TEXT,
+      changeType    TEXT NOT NULL,
+      effectiveDate TEXT,
+      summary       TEXT NOT NULL,
+      relevance     TEXT NOT NULL,                 -- high | medium | low
+      policyId      INTEGER REFERENCES policies(id) ON DELETE SET NULL,
+      createdAt     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_import_docs_job ON import_docs(jobId, status);
+    CREATE INDEX IF NOT EXISTS idx_history_payer ON history_entries(payerId, publishedDate);
+
     -- Claude API calls, for the usage/cost line.
     CREATE TABLE IF NOT EXISTS ai_usage (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      kind         TEXT NOT NULL,               -- 'brief' | 'change'
+      kind         TEXT NOT NULL,               -- 'brief' | 'change' | 'import'
       refId        INTEGER NOT NULL,
       model        TEXT NOT NULL,
       inputTokens  INTEGER NOT NULL,
@@ -108,7 +159,7 @@ function initSchema(db: Database.Database) {
   `);
 }
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // Fields removed when the app was simplified. Databases created by earlier
 // versions still have these columns; drop them so the current inserts work
@@ -148,6 +199,7 @@ const ADDED_COLUMNS: Record<string, [name: string, definition: string][]> = {
     ["briefError", "TEXT"],
   ],
   watch_pages: [["policyId", "INTEGER REFERENCES policies(id) ON DELETE CASCADE"]],
+  policy_changes: [["sourceUrl", "TEXT"]],
   page_changes: [
     ["aiSummary", "TEXT"],
     ["aiSummaryAt", "TEXT"],
@@ -209,7 +261,7 @@ export function getDb(): Database.Database {
   const db = new Database(DB_PATH);
   initSchema(db);
 
-  // user_version: 0 = brand-new file, 1-3 = earlier app versions, 4 = current.
+  // user_version: 0 = brand-new file, 1-4 = earlier app versions, 5 = current.
   const version = db.pragma("user_version", { simple: true }) as number;
   if (version < SCHEMA_VERSION) {
     dropLegacyColumns(db);

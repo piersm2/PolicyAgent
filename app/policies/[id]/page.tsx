@@ -161,6 +161,11 @@ export default function PolicyDetailPage({ params }: { params: { id: string } })
                 <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-brand-500 ring-2 ring-brand-100" />
                 <div className="text-sm font-medium text-slate-700">{formatDate(c.changeDate)}</div>
                 <p className="mt-1 text-sm text-slate-700">{c.summary}</p>
+                {safeHref(c.sourceUrl) && (
+                  <a href={safeHref(c.sourceUrl)!} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline">
+                    Source ↗
+                  </a>
+                )}
               </li>
             ))}
           </ol>

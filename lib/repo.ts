@@ -269,7 +269,7 @@ export function recentChanges(limit: number): PolicyChangeWithContext[] {
     .all(limit) as PolicyChangeWithContext[];
 }
 
-export function createChange(input: Omit<PolicyChange, "id" | "createdAt">): PolicyChange {
+export function createChange(input: Omit<PolicyChange, "id" | "createdAt" | "sourceUrl">): PolicyChange {
   const db = getDb();
   const info = db
     .prepare("INSERT INTO policy_changes (policyId, changeDate, summary) VALUES (@policyId, @changeDate, @summary)")

@@ -40,21 +40,28 @@ export async function askClaude<T>(opts: {
   system: string;
   content: Anthropic.Beta.BetaContentBlockParam[];
   schema: Record<string, unknown>;
+  /** Above 16000, the request streams so long replies don't hit HTTP timeouts. */
+  maxTokens?: number;
 }): Promise<AiResult<T>> {
   if (!aiEnabled()) throw new AiError("AI summaries are off: set ANTHROPIC_API_KEY (see the README).");
 
   let response: Anthropic.Beta.BetaMessage;
   try {
-    response = await getClient().beta.messages.create({
+    const maxTokens = opts.maxTokens ?? 16000;
+    const params = {
       model: AI_MODEL,
-      max_tokens: 16000,
+      max_tokens: maxTokens,
       // If a safety classifier declines, the API retries on its recommended fallback model.
       betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: AI_EFFORT, format: { type: "json_schema", schema: opts.schema } },
+      fallbacks: "default" as const,
+      output_config: { effort: AI_EFFORT, format: { type: "json_schema" as const, schema: opts.schema } },
       system: opts.system,
-      messages: [{ role: "user", content: opts.content }],
-    });
+      messages: [{ role: "user" as const, content: opts.content }],
+    };
+    response =
+      maxTokens > 16000
+        ? await getClient().beta.messages.stream(params).finalMessage()
+        : await getClient().beta.messages.create(params);
   } catch (err) {
     throw new AiError(describeApiError(err));
   }

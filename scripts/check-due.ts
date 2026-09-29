@@ -10,6 +10,7 @@
 import "./load-env";
 import { checkPages, type CheckResult } from "../lib/watch";
 import { scheduleSummaries } from "../lib/summaries";
+import { processImports } from "../lib/history";
 
 const port = process.env.PORT || "3000";
 
@@ -35,6 +36,9 @@ async function main() {
   if (!results) {
     results = await checkPages("due");
     await scheduleSummaries();
+    // Continue a queued historical import a batch at a time.
+    const imported = await processImports(Number(process.env.IMPORT_PER_RUN) || 20);
+    if (imported) console.log(`Historical import: processed ${imported} step(s).`);
   }
 
   const count = (o: string) => results!.filter((r) => r.outcome === o).length;

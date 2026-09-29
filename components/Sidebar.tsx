@@ -8,6 +8,7 @@ type Icon = () => JSX.Element;
 const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/", label: "Overview", icon: GridIcon },
   { href: "/policies", label: "Policies", icon: DocIcon },
+  { href: "/history", label: "History", icon: ClockIcon },
   { href: "/payers", label: "Payers", icon: BuildingIcon },
   { href: "/watch", label: "Watch list", icon: RadarIcon },
 ];
@@ -139,6 +140,15 @@ function DocIcon() {
     <svg {...iconProps}>
       <path d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />
       <path d="M14 3.5V8h4.5M8.5 12.5h7M8.5 16h5" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
     </svg>
   );
 }
