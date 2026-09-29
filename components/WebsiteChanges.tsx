@@ -105,7 +105,9 @@ export function WebsiteChanges({
                   {c.aiError ? "Try again" : "Summarize now"}
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <p className="mt-2 text-xs text-slate-400">Summary comes from your daily Cowork task.</p>
+            )}
             <details className="mt-2 text-sm">
               <summary className="cursor-pointer text-xs font-medium text-brand-600">Show details</summary>
               <div className="mt-2 space-y-2">
